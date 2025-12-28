@@ -86,10 +86,15 @@ SAFETY_PROXY_COLUMNS = {
 # ----------------------------
 pattern_dollar_sign = re.compile(r"\$")
 pattern_percent_sign = re.compile(r"%")
+pattern_times_sign = re.compile(r"x")
+
 def to_float(value):
     try:
+    
         value = re.sub(pattern_dollar_sign,"",value)
         value = re.sub(pattern_percent_sign,"",value)
+        value = re.sub(pattern_times_sign,"",value)
+
         if value is None or value == "":
             return None
         return float(value)
@@ -129,8 +134,8 @@ def generate_thresholds(rows, output_path):
         thresholds[col] = {
             "min": min(values),
             "max": max(values),
-            "average": mean(values),
-            "description": COLUMN_EXPLANATIONS.get(col, "No description available.")
+            "avg": mean(values),
+            "desc": COLUMN_EXPLANATIONS.get(col, "No description available.")
         }
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -144,13 +149,22 @@ def generate_thresholds(rows, output_path):
 # ----------------------------
 def row_passes_thresholds(row, thresholds):
     for col, limits in thresholds.items():
+
         v = to_float(row.get(col))
+
         if v is None:
+            continue # skip non numeric values for filtering
+
+        min_thresh = limits.get("min", None)
+
+        if min_thresh and v < min_thresh:
             return False
-        if "min" in limits and v < limits["min"]:
+        
+        max_thresh = limits.get("max", None)
+        
+        if max_thresh and v > max_thresh:
             return False
-        if "max" in limits and v > limits["max"]:
-            return False
+
     return True
 
 
@@ -294,7 +308,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", default="_divident_stocks_filtered.csv", help="Filtered output CSV")
     parser.add_argument("-t", "--thresholds", default="_divident_stocks_thresholds.json", help="Thresholds JSON for filtering")
     parser.add_argument("-g", "--generate_thresholds", action="store_true", help="Generate initial thresholds JSON and exit")
-    parser.add_argument("-w", "--weigths", help="Score weights JSON")
+    parser.add_argument("-w", "--weights", help="Score weights JSON")
 
     args = parser.parse_args()
 

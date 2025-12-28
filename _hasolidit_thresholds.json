@@ -1,0 +1,140 @@
+{
+  "Price": {
+    "avg": 129.40241726618706,
+    "desc": "Current stock price."
+  },
+  "Div Yield": {
+    "min": 2.00,
+    "max": null,
+    "avg": 2.884005722460658,
+    "desc": "Annual dividend yield percentage. Higher is better for income investors."
+  },
+  "5Y Avg Yield": {
+    "avg": 2.8667095851216025,
+    "desc": "Average dividend yield over last 5 years."
+  },
+  "Current Div": {
+    "avg": 0.6846022889842632,
+    "desc": "Most recent dividend payment."
+  },
+  "Payouts/Year": {
+    "avg": 3.92274678111588,
+    "desc": "Number of dividend payments per year."
+  },
+  "Annualized": {
+    "avg": 2.6450157367668097,
+    "desc": "Annualized dividend amount."
+  },
+  "Previous Div": {
+    "avg": 0.608793991416309,
+    "desc": "No description available."
+  },
+  "Low": {
+    "avg": 100.77620886981401,
+    "desc": "52-week low price."
+  },
+  "High": {
+    "avg": 147.8603323699422,
+    "desc": "52-week high price."
+  },
+  "Chowder Number": {
+    "min": 8.0,
+    "max": null,
+    "avg": 13.396423462088698,
+    "desc": "Dividend Yield + Dividend Growth Rate. Measures income + growth."
+  },
+  "DGR 1Y": {
+    "min": 3.0,
+    "max": null,
+    "avg": 5.818884120171674,
+    "desc": "Dividend Growth Rate over 1 year."
+  },
+  "DGR 3Y": {
+    "min": 3.0,
+    "max": null,
+    "avg": 6.865329512893982,
+    "desc": "Dividend Growth Rate over 3 years."
+  },
+  "DGR 5Y": {
+    "min": 3.0,
+    "max": null,
+    "avg": 10.391954022988505,
+    "desc": "Dividend Growth Rate over 5 years."
+  },
+  "DGR 10Y": {
+    "min": 3.0,
+    "max": null,
+    "avg": 9.357374392220422,
+    "desc": "Dividend Growth Rate over 10 years."
+  },
+  "TTR 1Y": {
+    "avg": 10.893103448275863,
+    "desc": "Total return over 1 year."
+  },
+  "TTR 3Y": {
+    "avg": 11.942097701149425,
+    "desc": "Total return over 3 years."
+  },
+  "FV (Peter Lynch)": {
+    "avg": 134.76516034985423,
+    "desc": "Fair value estimate using Peter Lynch method."
+  },
+  "FV (Peter Lynch) %": {
+    "min": null,
+    "max": 10,
+    "avg": 41.30825958702065,
+    "desc": "Percent over/undervalued relative to fair value."
+  },
+  "EPS 1Y": {
+    "avg": 0.0,
+    "desc": "Earnings per share growth (1 year)."
+  },
+  "Revenue 1Y": {
+    "avg": 3.28014598540146,
+    "desc": "Revenue growth over last year."
+  },
+  "NPM": {
+    "avg": 15.849070100143061,
+    "desc": "Net profit margin. Measures profitability."
+  },
+  "CF/Share": {
+    "min": 0,
+    "max": null,
+    "avg": 9.705221745350501,
+    "desc": "Cash flow per share."
+  },
+  "ROE": {
+    "min": 15,
+    "max": null,
+    "avg": 18.882127031019202,
+    "desc": "Return on equity. Capital efficiency."
+  },
+  "Current R": {
+    "avg": 2.0235602094240837,
+    "desc": "Current ratio. Liquidity measure."
+  },
+  "Debt/Capital": {
+    "min": null,
+    "max": 0.5,
+    "avg": 37.05864106351551,
+    "desc": "Debt to total capital. Lower is safer."
+  },
+  "ROTC": {
+    "min": 8,
+    "max": null,
+    "avg": 10.549782923299565,
+    "desc": "Return on total capital."
+  },
+  "P/E": {
+    "avg": 24.75933734939759,
+    "desc": "Price-to-earnings ratio. Valuation metric."
+  },
+  "P/BV": {
+    "avg": 4.703101920236337,
+    "desc": "Price-to-book value ratio."
+  },
+  "PEG": {
+    "avg": 3.950338680926916,
+    "desc": "PEG ratio. Valuation adjusted for growth."
+  }
+}

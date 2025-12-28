@@ -1,5 +1,7 @@
 .vscode/
 .venv/
 
-stocks*.csv
-*thresholds.json
+*.csv
+*.json
+
+!_hasolidit_thresholds.json

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
 import re
-import argparse
+import sys
 import csv
 import json
-import math
+import argparse
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from statistics import mean
+
+from pprint import pprint
 
 # ----------------------------
 # Column explanations
 # ----------------------------
-COLUMN_EXPLANATIONS = {
+COL_DESC = {
     "Price": "Current stock price.",
     "Div Yield": "Annual dividend yield percentage. Higher is better for income investors.",
     "5Y Avg Yield": "Average dividend yield over last 5 years.",
@@ -40,45 +42,28 @@ COLUMN_EXPLANATIONS = {
     "ROTC": "Return on total capital.",
     "P/E": "Price-to-earnings ratio. Valuation metric.",
     "P/BV": "Price-to-book value ratio.",
-    "PEG": "PEG ratio. Valuation adjusted for growth."
+    "PEG": "Price / Earnings to Growth ratio. Valuation adjusted for growth."
 }
 
-# ----------------------------
-# Default score weights
-# ----------------------------
-DEFAULT_SCORE_WEIGHTS = {
-    "Div Yield": 1.2,
-    "Chowder Number": 1.5,
-    "DGR 5Y": 1.2,
-    "DGR 10Y": 1.0,
-    "EPS 1Y": 1.0,
-    "Revenue 1Y": 0.8,
-    "ROE": 1.0,
-    "ROTC": 0.8,
-    "TTR 3Y": 1.0,
-
-    # penalties (lower is better)
-    "Debt/Capital": -1.2,
-    "Payouts/Year": 0.0,   # neutral
-    "P/E": -0.8,
-    "PEG": -0.6
-}
-
-LOWER_IS_BETTER = {
+COL_LOWER_IS_BETTER = {
     "Debt/Capital",
     "P/E",
     "PEG",
     "P/BV"
 }
 
-FAIR_VALUE_COLUMN = "FV (Peter Lynch) %"
+COL_SECTOR = "Sector"
 
-SAFETY_PROXY_COLUMNS = {
-    "Payout Ratio": ("Annualized", "EPS 1Y"),  # derived
-    "Debt/Capital": None,
-    "ROE": None,
-    "CF/Share": None,
-    "EPS 1Y": None
+COL_FAIR_VALUE_PCT = "FV (Peter Lynch) %"
+
+COL_ANNUAL_YIELD = "Annualized"
+COL_ANNUAL_EPS = "EPS 1Y"
+
+COL_SAFETY_SCORE_INPUTS = {
+    COL_ANNUAL_EPS,
+    "Debt/Capital",
+    "ROE",
+    "CF/Share",
 }
 
 # ----------------------------
@@ -98,18 +83,18 @@ def to_float(value):
         if value is None or value == "":
             return None
         return float(value)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
 def load_csv(path):
     with open(path, newline="", encoding="utf-8-sig") as f:
-        return list(csv.DictReader(f))
+        return [ OrderedDict(d) for d in csv.DictReader(f) ]
 
 
-def save_csv(path, rows, fieldnames):
+def save_csv(path, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
 
@@ -135,7 +120,7 @@ def generate_thresholds(rows, output_path):
             "min": min(values),
             "max": max(values),
             "avg": mean(values),
-            "desc": COLUMN_EXPLANATIONS.get(col, "No description available.")
+            "desc": COL_DESC.get(col, "No description available.")
         }
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -147,7 +132,25 @@ def generate_thresholds(rows, output_path):
 # ----------------------------
 # Filtering
 # ----------------------------
-def row_passes_thresholds(row, thresholds):
+def load_thresholds(args):
+    if not args.thresholds:
+        raise Exception("filtering requires --thresholds - Use -g to generate initial passthrough thresholds")
+
+    with open(args.thresholds, "r") as f:
+        thresholds = json.load(f)
+
+    return thresholds
+
+def update_reject_stats(reject_stats, col, limit):
+    if reject_stats is None:
+        return
+    
+    reject_name = f"{col}_{limit}"
+    reject_count = reject_stats.get(reject_name, 0)
+    reject_count += 1
+    reject_stats[reject_name] = reject_count
+
+def row_passes_thresholds(row, thresholds, reject_stats=None):
     for col, limits in thresholds.items():
 
         v = to_float(row.get(col))
@@ -158,29 +161,89 @@ def row_passes_thresholds(row, thresholds):
         min_thresh = limits.get("min", None)
 
         if min_thresh and v < min_thresh:
+            update_reject_stats(reject_stats, col, "min")
             return False
         
         max_thresh = limits.get("max", None)
         
         if max_thresh and v > max_thresh:
+            update_reject_stats(reject_stats, col, "min")
             return False
 
     return True
 
 
+def filter_initial(args, rows):
+
+    thresholds = load_thresholds(args)
+
+    filtered = []
+    reject_stats = OrderedDict()
+
+    print(f"\nGot {len(rows)} rows before filtering\n")
+
+    for r in rows:
+        if row_passes_thresholds(r, thresholds, reject_stats):
+            filtered.append(r)
+
+    reject_stats = OrderedDict(sorted(reject_stats.items(),key=lambda x: x[1], reverse=True))
+    print("\nFilter reject stats:\n")
+    pprint(reject_stats)
+
+    print(f"\nGot {len(filtered)} rows after initial filtering\n")
+
+    return filtered
+
+
 # ----------------------------
 # Scoring
 # ----------------------------
+DEFAULT_SCORE_WEIGHTS = {
+    "columns": {
+        "Div Yield": 1.2,
+        "Chowder Number": 1.5,
+        "DGR 5Y": 1.2,
+        "DGR 10Y": 1.0,
+        "EPS 1Y": 1.0,
+        "Revenue 1Y": 0.8,
+        "ROE": 1.0,
+        "ROTC": 0.8,
+        "TTR 3Y": 1.0,
+        # penalties (lower is better)
+        "Debt/Capital": -1.2,
+        "P/E": -0.8,
+        "PEG": -0.6,
+    },
+
+    # derrived scores
+    "safety" : 1.2,
+    "value": 0.8,
+}
+
+COL_TOTAL_SCORE = "_total_score"
+COL_SAFETY_SCORE = "_safety_score"
+COL_VALUE_SCORE = "_value_score"
+
+def load_weights(args):
+    if args.weights:
+        with open(args.weights, "r") as f:
+            weights = json.load(f)
+    else:
+        weights = DEFAULT_SCORE_WEIGHTS
+
+    return weights
+
+
 def sector_min_max(rows, column):
     data = defaultdict(list)
     for r in rows:
         v = to_float(r.get(column))
         if v is not None:
-            data[r["Sector"]].append(v)
+            data[r[COL_SECTOR]].append(v)
 
     return {
-        s: (min(vals), max(vals))
-        for s, vals in data.items() if vals
+        sector : (min(vals), max(vals))
+        for sector, vals in data.items() if vals
     }
 
 
@@ -191,39 +254,43 @@ def sector_normalize(value, sector, min_max):
     return (value - mn) / (mx - mn)
 
 
-def margin_of_safety_score(row):
-    fv = to_float(row.get(FAIR_VALUE_COLUMN))
+def compute_value_score(row):
+    fv = to_float(row.get(COL_FAIR_VALUE_PCT))
     if fv is None:
         return 0.5
 
-    # clamp to [-30%, +30%]
-    fv = max(-30.0, min(30.0, fv))
-    return (fv + 30.0) / 60.0
+    # clamp to [-50%, +50%]
+    fv = max(-50.0, min(50.0, fv))
+    return (1.0 - (fv + 50.0) / 100.0)
 
 
-def dividend_safety_proxy(row, sector_stats):
+def compute_safety_score(row, sector_stats):
     scores = []
 
     # Derived payout ratio proxy
-    div = to_float(row.get("Annualized"))
-    eps = to_float(row.get("EPS 1Y"))
-    if div is not None and eps and eps > 0:
+    div = to_float(row.get(COL_ANNUAL_YIELD))
+    eps = to_float(row.get(COL_ANNUAL_EPS))
+
+    if div is not None and eps is not None and eps > 0:
         payout = div / eps
         scores.append(1.0 - min(payout, 1.5) / 1.5)
 
-    for col in ["Debt/Capital", "ROE", "CF/Share", "EPS 1Y"]:
+    for col in COL_SAFETY_SCORE_INPUTS:
         v = to_float(row.get(col))
         if v is None:
             continue
-        norm = sector_normalize(v, row["Sector"], sector_stats[col])
-        if col == "Debt/Capital":
+        norm = sector_normalize(v, row[COL_SECTOR], sector_stats[col])
+        if col in COL_LOWER_IS_BETTER:
             norm = 1.0 - norm
         scores.append(norm)
 
     return sum(scores) / len(scores) if scores else 0.5
 
 
-def compute_score(rows, weights):
+def compute_scores(args, rows):
+
+    weights = load_weights(args)
+
     sector_stats = {
         col: sector_min_max(rows, col)
         for col in weights
@@ -231,7 +298,7 @@ def compute_score(rows, weights):
 
     safety_stats = {
         col: sector_min_max(rows, col)
-        for col in ["Debt/Capital", "ROE", "CF/Share", "EPS 1Y"]
+        for col in COL_SAFETY_SCORE_INPUTS
     }
 
     scored = []
@@ -244,23 +311,35 @@ def compute_score(rows, weights):
             if v is None:
                 continue
 
-            norm = sector_normalize(v, row["Sector"], sector_stats[col])
+            norm = sector_normalize(v, row[COL_SECTOR], sector_stats[col])
 
-            if col in LOWER_IS_BETTER:
+            if col in COL_LOWER_IS_BETTER:
                 norm = 1.0 - norm
 
             total += norm * abs(w)
             wsum += abs(w)
 
         # valuation bonus
-        total += margin_of_safety_score(row) * 0.8
-        wsum += 0.8
+        value_weight = weights.get("value", 0.0)
+        value_score = compute_value_score(row)
+        total += value_score * value_weight
+        wsum += value_weight
+
+        row[COL_VALUE_SCORE] = value_score
+        row.move_to_end(COL_VALUE_SCORE, last=False)
 
         # safety proxy
-        total += dividend_safety_proxy(row, safety_stats) * 1.2
-        wsum += 1.2
+        safety_weight = weights.get("safety", 0.0)
+        safety_score = compute_safety_score(row, safety_stats)
+        total += safety_score * safety_weight
+        wsum += safety_weight
 
-        row["_score"] = total / wsum if wsum else 0.0
+        row[COL_SAFETY_SCORE] = safety_score
+        row.move_to_end(COL_SAFETY_SCORE, last=False)
+
+        row[COL_TOTAL_SCORE] = total # / wsum if wsum else 0.0 # add this if want normalized score
+        row.move_to_end(COL_TOTAL_SCORE, last=False)
+
         scored.append(row)
 
     return scored
@@ -277,39 +356,39 @@ def divicheck(args):
         generate_thresholds(rows, args.thresholds)
         return
 
-    if not args.thresholds:
-        raise Exception("filtering requires --thresholds - Use -g to generate them first")
+    filtered = filter_initial(args, rows)
 
-    with open(args.thresholds, "r") as f:
-        thresholds = json.load(f)
+    scored = compute_scores(args, filtered)
 
-    filtered = [r for r in rows if row_passes_thresholds(r, thresholds)]
+    # TODO: add additional computed score filters
+    filtered_scored = scored
 
-    if args.weights:
-        with open(args.weights, "r") as f:
-            weights = json.load(f)
-    else:
-        weights = DEFAULT_SCORE_WEIGHTS
+    if len(filtered_scored) == 0:
+        print(f"\nNo data for output CSV after filtering :(\n")
+        return
 
-    scored = compute_score(filtered, weights)
+    filtered_scored.sort(key=lambda r: (r[COL_SECTOR], -r["_total_score"]))
 
-    scored.sort(key=lambda r: (r["Sector"], -r["_score"]))
+    save_csv(args.output, filtered_scored)
 
-    fieldnames = list(rows[0].keys()) + ["_score"]
-
-    save_csv(args.output, scored, fieldnames)
-
-    print(f"Filtered CSV written to {args.output}")
+    print(f"\nFiltered CSV written to {args.output}\n")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", required=True, help="Input all divident stocks CSV file from: https://www.dripinvesting.org")
+    parser.add_argument("-i", "--input", default=None, help="Input all divident stocks CSV file from: https://www.dripinvesting.org")
     parser.add_argument("-o", "--output", default="_divident_stocks_filtered.csv", help="Filtered output CSV")
     parser.add_argument("-t", "--thresholds", default="_divident_stocks_thresholds.json", help="Thresholds JSON for filtering")
     parser.add_argument("-g", "--generate_thresholds", action="store_true", help="Generate initial thresholds JSON and exit")
     parser.add_argument("-w", "--weights", help="Score weights JSON")
 
     args = parser.parse_args()
+
+    if len(sys.argv) < 2:
+        parser.print_help()
+        # for quick and dirty hardcoded debug
+        args.input = "stocks-2025-12-26.csv"
+        args.thresholds = "_divident_stocks_thresholds.json"
+
 
     divicheck(args)

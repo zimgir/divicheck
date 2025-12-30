@@ -291,9 +291,13 @@ def compute_scores(args, rows):
 
     weights = load_weights(args)
 
+    col_weights = weights.get("columns", {})
+    value_weight = weights.get("value", 0.0)
+    safety_weight = weights.get("safety", 0.0)
+
     sector_stats = {
         col: sector_min_max(rows, col)
-        for col in weights
+        for col in col_weights
     }
 
     safety_stats = {
@@ -302,11 +306,12 @@ def compute_scores(args, rows):
     }
 
     scored = []
+
     for row in rows:
         total = 0.0
         wsum = 0.0
 
-        for col, w in weights.items():
+        for col, w in col_weights.items():
             v = to_float(row.get(col))
             if v is None:
                 continue
@@ -320,7 +325,6 @@ def compute_scores(args, rows):
             wsum += abs(w)
 
         # valuation bonus
-        value_weight = weights.get("value", 0.0)
         value_score = compute_value_score(row)
         total += value_score * value_weight
         wsum += value_weight
@@ -329,7 +333,6 @@ def compute_scores(args, rows):
         row.move_to_end(COL_VALUE_SCORE, last=False)
 
         # safety proxy
-        safety_weight = weights.get("safety", 0.0)
         safety_score = compute_safety_score(row, safety_stats)
         total += safety_score * safety_weight
         wsum += safety_weight

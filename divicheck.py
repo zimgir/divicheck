@@ -223,6 +223,7 @@ DEFAULT_SCORE_WEIGHTS = {
 COL_TOTAL_SCORE = "_total_score"
 COL_SAFETY_SCORE = "_safety_score"
 COL_VALUE_SCORE = "_value_score"
+COL_PAYOUT_RATIO = "_payout_ratio"
 
 def load_weights(args):
     if args.weights:
@@ -274,6 +275,10 @@ def compute_safety_score(row, sector_stats):
     if div is not None and eps is not None and eps > 0:
         payout = div / eps
         scores.append(1.0 - min(payout, 1.5) / 1.5)
+    else:
+        payout = 0.0
+
+    row[COL_PAYOUT_RATIO] = payout
 
     for col in COL_SAFETY_SCORE_INPUTS:
         v = to_float(row.get(col))

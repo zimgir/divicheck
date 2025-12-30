@@ -38,31 +38,31 @@
     "desc": "52-week high price."
   },
   "Chowder Number": {
-    "min": 8.0,
+    "min": 7.0,
     "max": null,
     "avg": 13.396423462088698,
     "desc": "Dividend Yield + Dividend Growth Rate. Measures income + growth."
   },
   "DGR 1Y": {
-    "min": 3.0,
+    "min": null,
     "max": null,
     "avg": 5.818884120171674,
     "desc": "Dividend Growth Rate over 1 year."
   },
   "DGR 3Y": {
-    "min": 3.0,
+    "min": null,
     "max": null,
     "avg": 6.865329512893982,
     "desc": "Dividend Growth Rate over 3 years."
   },
   "DGR 5Y": {
-    "min": 3.0,
+    "min": null,
     "max": null,
     "avg": 10.391954022988505,
     "desc": "Dividend Growth Rate over 5 years."
   },
   "DGR 10Y": {
-    "min": 3.0,
+    "min": null,
     "max": null,
     "avg": 9.357374392220422,
     "desc": "Dividend Growth Rate over 10 years."
@@ -81,7 +81,7 @@
   },
   "FV (Peter Lynch) %": {
     "min": null,
-    "max": 10,
+    "max": 50.0,
     "avg": 41.30825958702065,
     "desc": "Percent over/undervalued relative to fair value."
   },
@@ -115,7 +115,7 @@
   },
   "Debt/Capital": {
     "min": null,
-    "max": 0.5,
+    "max": 50,
     "avg": 37.05864106351551,
     "desc": "Debt to total capital. Lower is safer."
   },

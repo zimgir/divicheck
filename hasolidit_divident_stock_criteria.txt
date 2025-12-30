@@ -1,0 +1,33 @@
+Divident yield greater than 2%
+
+History of increasing divident yield of at least 5 years. 
+
+Divident growth rate of 3-4 % for high yield 9% and more for low yield
+
+Chowder number of at least 8
+
+Payout ratio less than 60% (DPS to EPS ratio)
+
+SimplySafeDividents rating of over 60
+
+Credit score better than BBB
+
+Laverage ratio less than 0.5 (ratio between company's borrowed money to its assets value)
+
+EPS is increasing consistently each year with only short temporal discrepancies.
+
+FCF per share is positive in the last 10 years (cashflow for dividents)
+
+ROE greater than 15% (return on equity)
+
+Net worth over 2 B
+
+Beta is less than or equal to 1 (volatility compared to market)
+
+Current share price is lower or equal to its fair value price (can check according to fastgraph)
+
+What is the company's buisness model?
+
+What is the company's competetitive advantage and how long it is expected to hold it?
+
+Does the company have a history of buybacks?

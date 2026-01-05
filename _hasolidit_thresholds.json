@@ -120,7 +120,7 @@
     "desc": "Debt to total capital. Lower is safer."
   },
   "ROTC": {
-    "min": 8,
+    "min": null,
     "max": null,
     "avg": 10.549782923299565,
     "desc": "Return on total capital."

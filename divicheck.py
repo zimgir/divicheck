@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 
-import sys
 
 import argparse
 
-from collections import defaultdict, OrderedDict
-from statistics import mean
-from pprint import pprint
+
+
 
 import yfinance as yf
 import pandas as pd
 import numpy as np
 
-from columns import *
+from schema import *
 from utils import *
 from score import add_score_columns
 from fetch import add_beta_column, update_eps_column

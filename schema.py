@@ -1,5 +1,10 @@
 
+
 from collections import OrderedDict
+
+import pandas as pd
+
+from datasrc import *
 
 # container for column definition data
 class ColumnDefinition:
@@ -65,11 +70,6 @@ COL_PREV_DIV = "Prev Div ($)"
 COL_EX_DATE = "Ex Date"
 
 
-# columns to delete from specific source data
-COL_DELETE_SRC_DRIPINVESTING = {
-    "Logo"
-}
-
 # preprocessed column order schema
 COL_DEFS = OrderedDict((
     # main stock key
@@ -133,87 +133,92 @@ COL_DEFS = OrderedDict((
 
 
 COL_LOWER_IS_BETTER = {
-    "Debt/Capital",
-    "P/E",
-    "PEG",
-    "P/BV"
+    COL_DEBT_CAPITAL,
+    COL_P_BV,
+    COL_P_E,
+    COL_PEG,
 }
 
-COL_SAFETY_SCORE_INPUTS = {
-    COL_ANNUAL_EPS,
-    "Debt/Capital",
-    "ROE",
-    "CF/Share",
+COL_FILTER_TOTAL_SUM = {
+    COL_DIV_1Y,
 }
-def column_normalize(
+
+
+def schema_col_normalize(
     df: pd.DataFrame,
-    col: str,
-    *,
-    source_unit: str,
-    target_unit: str | None = None,
-    conversion_factor: float | None = None,
-    fx_column: str | None = None,
+    src_cols,
+    src_name,
     on_unexpected: str = "warn",  # "warn" | "error" | "ignore"
-    metadata: dict | None = None,
 ) -> pd.DataFrame:
-    """
-    Explicit unit normalization with validation and metadata tracking.
-    """
 
-    s = df[col].astype(str)
+    # first delete all redundant cols according to src name
+    cols_to_delete = SRC_DELETE_COLS.get(src_name, ())
 
-    # --- Validate unexpected symbols ---
-    allowed_symbols = set()
-    if source_unit in UNIT_DEFINITIONS:
-        allowed_symbols.update(UNIT_DEFINITIONS[source_unit]["symbols"])
+    if len(cols_to_delete) > 0:
+        df = df.drop(cols_to_delete, axis=1)
 
-    unexpected = (
-        s.str.replace(r"[\d\.\-,\s]", "", regex=True)
-         .str.replace("".join(allowed_symbols), "", regex=False)
-    )
 
-    if unexpected.str.len().gt(0).any():
-        msg = f"Unexpected symbols in column '{col}'"
-        if on_unexpected == "error":
-            raise ValueError(msg)
-        elif on_unexpected == "warn":
-            print(f"WARNING: {msg}")
+    for src_col_name in src_cols:
 
-    # --- Remove known unit symbols ---
-    for sym in allowed_symbols:
-        s = s.str.replace(sym, "", regex=False)
+        schema_col_name = SRC_TO_SCHEMA_COL_NAME[src_name][src_col_name]
 
-    # --- Numeric cleanup ---
-    values = (
-        s.str.replace(",", "", regex=False)
-         .str.replace(r"[^\d\.\-]", "", regex=True)
-         .replace("", np.nan)
-         .astype(float)
-    )
+        col_def = COL_DEFS[schema_col_name]
 
-    # --- Conversion logic ---
-    if fx_column is not None:
-        values = values * df[fx_column].astype(float)
-    elif conversion_factor is not None:
-        values = values * conversion_factor
 
-    # --- Write back ---
-    df[col] = values
+        s = df[src_col_name].astype(str)
 
-    # --- Rename column ---
-    final_unit = target_unit or source_unit
-    suffix = UNIT_DEFINITIONS.get(final_unit, {}).get("suffix")
+        # --- Validate unexpected symbols ---
+        allowed_symbols = set()
+        if source_unit in UNIT_DEFINITIONS:
+            allowed_symbols.update(UNIT_DEFINITIONS[source_unit]["symbols"])
 
-    if suffix:
-        df = df.rename(columns={col: f"{col} ({suffix})"})
+        unexpected = (
+            s.str.replace(r"[\d\.\-,\s]", "", regex=True)
+            .str.replace("".join(allowed_symbols), "", regex=False)
+        )
 
-    # --- Metadata export ---
-    if metadata is not None:
-        metadata[col] = {
-            "source_unit": source_unit,
-            "target_unit": final_unit,
-            "conversion_factor": conversion_factor,
-            "fx_column": fx_column,
-        }
+        if unexpected.str.len().gt(0).any():
+            msg = f"Unexpected symbols in column '{col}'"
+            if on_unexpected == "error":
+                raise ValueError(msg)
+            elif on_unexpected == "warn":
+                print(f"WARNING: {msg}")
+
+        # --- Remove known unit symbols ---
+        for sym in allowed_symbols:
+            s = s.str.replace(sym, "", regex=False)
+
+        # --- Numeric cleanup ---
+        values = (
+            s.str.replace(",", "", regex=False)
+            .str.replace(r"[^\d\.\-]", "", regex=True)
+            .replace("", np.nan)
+            .astype(float)
+        )
+
+        # --- Conversion logic ---
+        if fx_column is not None:
+            values = values * df[fx_column].astype(float)
+        elif conversion_factor is not None:
+            values = values * conversion_factor
+
+        # --- Write back ---
+        df[col] = values
+
+        # --- Rename column ---
+        final_unit = target_unit or source_unit
+        suffix = UNIT_DEFINITIONS.get(final_unit, {}).get("suffix")
+
+        if suffix:
+            df = df.rename(columns={col: f"{col} ({suffix})"})
+
+        # --- Metadata export ---
+        if metadata is not None:
+            metadata[col] = {
+                "source_unit": source_unit,
+                "target_unit": final_unit,
+                "conversion_factor": conversion_factor,
+                "fx_column": fx_column,
+            }
 
     return df

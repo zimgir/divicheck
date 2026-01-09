@@ -2,14 +2,17 @@
 
 from collections import OrderedDict
 
+import numpy as np
 import pandas as pd
 
-from datasrc import *
+from source import SRC_DEFS
 
 # container for column definition data
 class ColumnDefinition:
-    def __init__(self, name, desc, unit=None, convert_factor=None, convert_factor_col=None):
+    def __init__(self, name, desc, unit=None):
         self.__dict__.update(locals())
+
+        self.src_name = None
 
 
 # main stock key
@@ -144,81 +147,77 @@ COL_FILTER_TOTAL_SUM = {
 }
 
 
-def schema_col_normalize(
+def schema_numeric_col_normalize(
     df: pd.DataFrame,
     src_cols,
     src_name,
     on_unexpected: str = "warn",  # "warn" | "error" | "ignore"
 ) -> pd.DataFrame:
 
+    src_info = SRC_DEFS[src_name]
+
     # first delete all redundant cols according to src name
-    cols_to_delete = SRC_DELETE_COLS.get(src_name, ())
+    cols_to_delete = src_info.get_delete_cols()
 
     if len(cols_to_delete) > 0:
         df = df.drop(cols_to_delete, axis=1)
 
-
+    # normalize numeric columns for given source
     for src_col_name in src_cols:
 
-        schema_col_name = SRC_TO_SCHEMA_COL_NAME[src_name][src_col_name]
+        schema_col_name = src_info.get_col_schema_name(src_col_name)
+
+        src_col_allowed_symbols = src_info.get_col_allowed_symbols(src_col_name)
+
+        src_col_convert_col = src_info.get_col_convert_col_name(src_col_name)
+
+        src_col_convert_factor = src_info.get_col_convert_factor(src_col_name)
 
         col_def = COL_DEFS[schema_col_name]
 
-
+        # check for unexpected symbols
         s = df[src_col_name].astype(str)
 
-        # --- Validate unexpected symbols ---
-        allowed_symbols = set()
-        if source_unit in UNIT_DEFINITIONS:
-            allowed_symbols.update(UNIT_DEFINITIONS[source_unit]["symbols"])
+        # remove always allowed numeric symbols
+        unexpected = s.str.replace(r"[\d\.\-,\s]", "", regex=True)
 
-        unexpected = (
-            s.str.replace(r"[\d\.\-,\s]", "", regex=True)
-            .str.replace("".join(allowed_symbols), "", regex=False)
-        )
+        # remove col allowed symbols such as units like $
+        for sym in src_col_allowed_symbols:
+            unexpected = unexpected.str.replace(sym, "", regex=False)
 
+        # check if anything unexpected left after removing all the expected
         if unexpected.str.len().gt(0).any():
-            msg = f"Unexpected symbols in column '{col}'"
+            msg = f"Unexpected symbols in column '{src_col_name}' from source '{src_name}'"
             if on_unexpected == "error":
                 raise ValueError(msg)
             elif on_unexpected == "warn":
                 print(f"WARNING: {msg}")
 
-        # --- Remove known unit symbols ---
-        for sym in allowed_symbols:
+
+        # remove expected non numeric symbols such as units
+        for sym in src_col_allowed_symbols:
             s = s.str.replace(sym, "", regex=False)
 
-        # --- Numeric cleanup ---
+        # remove all non numeric symbols - empty col turns into a NaN - as float
         values = (
-            s.str.replace(",", "", regex=False)
-            .str.replace(r"[^\d\.\-]", "", regex=True)
+            s.str.replace(r"[^\d\.\-]", "", regex=True)
             .replace("", np.nan)
             .astype(float)
         )
 
-        # --- Conversion logic ---
-        if fx_column is not None:
-            values = values * df[fx_column].astype(float)
-        elif conversion_factor is not None:
-            values = values * conversion_factor
+        # conversion logic for curency or %
+        if src_col_convert_col is not None:
+            values = values * df[src_col_convert_col].astype(float)
+        elif src_col_convert_factor is not None:
+            values = values * src_col_convert_factor
 
-        # --- Write back ---
-        df[col] = values
+        # write back normalized data
+        df[src_col_name] = values
 
-        # --- Rename column ---
-        final_unit = target_unit or source_unit
-        suffix = UNIT_DEFINITIONS.get(final_unit, {}).get("suffix")
+        # rename column to schema name
+        df = df.rename(columns={src_col_name: schema_col_name})
 
-        if suffix:
-            df = df.rename(columns={col: f"{col} ({suffix})"})
-
-        # --- Metadata export ---
-        if metadata is not None:
-            metadata[col] = {
-                "source_unit": source_unit,
-                "target_unit": final_unit,
-                "conversion_factor": conversion_factor,
-                "fx_column": fx_column,
-            }
+        # update metadata
+        col_def.src_name = src_name
 
     return df

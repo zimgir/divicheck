@@ -64,9 +64,9 @@ class SourceDripInvesting(DataSource):
             "Low" : SchemaColumns.PRICE_LOW,
             "High" : SchemaColumns.PRICE_HIGH,
             "Chowder Number": SchemaColumns.CHOWDER,
-            "DGR 1Y": SchemaColumns.DGR_1Y,
+            "DGR 1Y" : SchemaColumns.DGR_1Y,
             "DGR 3Y" : SchemaColumns.DGR_3Y,
-            "DGR 5Y": SchemaColumns.DGR_5Y,
+            "DGR 5Y" : SchemaColumns.DGR_5Y,
             "DGR 10Y": SchemaColumns.DGR_10Y,
             "TTR 1Y" : SchemaColumns.TTR_1Y,
             "TTR 3Y" : SchemaColumns.TTR_3Y,
@@ -85,11 +85,57 @@ class SourceDripInvesting(DataSource):
             "PEG" : SchemaColumns.PEG,
         }
 
-
-        self._col_allowed_symbols = {}
-        self._col_convert_col_name = {}
         self._col_convert_factor = {}
 
+        self._usd_cols = {
+            "Price",
+            "Current Div",
+            "Annualized",
+            "Previous Div",
+            "Low",
+            "High"
+            "FV (Peter Lynch)"
+            "CF/Share"
+        }
+
+        self._pct_cols = {
+            "Div Yield",
+            "5Y Avg Yield",
+            "DGR 1Y",
+            "DGR 3Y",
+            "DGR 5Y",
+            "DGR 10Y",
+            "TTR 1Y",
+            "TTR 3Y",
+            "FV (Peter Lynch) %",
+            "EPS 1Y",
+            "Revenue 1Y",
+            "NPM",
+            "ROE",
+            "Debt/Capital",
+            "ROTC"
+
+        }
+
+        self._x_cols = {
+            "P/E",
+            "P/BV"
+        }
+
+
+    def get_col_allowed_symbols(self, src_col_name):
+        if src_col_name in self._usd_cols:
+            return ("$",)
+
+        if src_col_name in self._pct_cols:
+            return ("%",)
+
+        if src_col_name in self._x_cols:
+            return ("x",)
+
+    def get_col_convert_factor(self, src_col_name):
+        if src_col_name in self._x_cols:
+            return 100.0
 
 
 class SourceFactory:

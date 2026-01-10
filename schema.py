@@ -9,10 +9,10 @@ from source import SRC_DEFS
 
 # container for column definition data
 class ColumnDefinition:
-    def __init__(self, name, desc, unit=None):
+    def __init__(self, name, desc, unit=None, is_numeric=True, lower_is_better=False, calc_avg=True, calc_sum=False):
         self.__dict__.update(locals())
 
-        self.src_name = None
+        self.src_info = None
 
 class SchemaColumns:
 
@@ -77,80 +77,101 @@ class SchemaColumns:
 # preprocessed column order schema
 COL_DEFS = OrderedDict((
     # main stock key
-    (SchemaColumns.SYMBOL, ColumnDefinition(SchemaColumns.SYMBOL, "Stock Symbol")),
+    (SchemaColumns.SYMBOL, ColumnDefinition(SchemaColumns.SYMBOL, "Stock Symbol", is_numeric=False)),
 
     # divicheck calculated scores
-    (SchemaColumns.SECTOR_RANK, ColumnDefinition(SchemaColumns.SECTOR_RANK, "Sector rank - lower is better overall in sector")),
-    (SchemaColumns.TOTAL_SCORE, ColumnDefinition(SchemaColumns.TOTAL_SCORE, "Total score computed by divicheck - Higher is better overall")),
-    (SchemaColumns.VALUE_SCORE, ColumnDefinition(SchemaColumns.VALUE_SCORE, "Value score computed by divicheck - Higher is better price to buy")),
-    (SchemaColumns.SAFETY_SCORE, ColumnDefinition(SchemaColumns.SAFETY_SCORE, "Safety score computed by divicheck - Higher is better in terms of safety")),
+    (SchemaColumns.SECTOR_RANK, ColumnDefinition(SchemaColumns.SECTOR_RANK,
+                                                  "Sector rank - lower is better overall in sector")),
+    (SchemaColumns.TOTAL_SCORE, ColumnDefinition(SchemaColumns.TOTAL_SCORE,
+                                                  "Total score computed by divicheck - Higher is better overall")),
+    (SchemaColumns.VALUE_SCORE, ColumnDefinition(SchemaColumns.VALUE_SCORE,
+                                                  "Value score computed by divicheck - Higher is better price to buy")),
+    (SchemaColumns.SAFETY_SCORE, ColumnDefinition(SchemaColumns.SAFETY_SCORE,
+                                                   "Safety score computed by divicheck - Higher is better in terms of safety")),
 
     # company info
-    (SchemaColumns.STOCK_TYPE, ColumnDefinition(SchemaColumns.STOCK_TYPE, "Divident stock type (in terms of increasing deividents) according to https://www.dripinvesting.org")),
-    (SchemaColumns.COMPANY, ColumnDefinition(SchemaColumns.COMPANY, "Company name")),
-    (SchemaColumns.SECTOR, ColumnDefinition(SchemaColumns.SECTOR, "Company sector")),
-    (SchemaColumns.INDUSTRY, ColumnDefinition(SchemaColumns.INDUSTRY, "Company industry")),
+    (SchemaColumns.STOCK_TYPE, ColumnDefinition(SchemaColumns.STOCK_TYPE,
+                                                "Divident stock type (in terms of increasing deividents) according to https://www.dripinvesting.org",
+                                                is_numeric=False)),
+    (SchemaColumns.COMPANY, ColumnDefinition(SchemaColumns.COMPANY, "Company name", is_numeric=False)),
+    (SchemaColumns.SECTOR, ColumnDefinition(SchemaColumns.SECTOR, "Company sector", is_numeric=False)),
+    (SchemaColumns.INDUSTRY, ColumnDefinition(SchemaColumns.INDUSTRY, "Company industry", is_numeric=False)),
 
     # main divident info
-    (SchemaColumns.PRICE, ColumnDefinition(SchemaColumns.PRICE, "Current share price", unit="$")),
-    (SchemaColumns.FAIR_VALUE, ColumnDefinition(SchemaColumns.FAIR_VALUE, "Percent over/under valued relative to fair value using Peter Lynch method", unit="%")),
-    (SchemaColumns.YIELD_1Y, ColumnDefinition(SchemaColumns.YIELD_1Y, "Share yield % per year", unit="%")),
-    (SchemaColumns.YIELD_5Y, ColumnDefinition(SchemaColumns.YIELD_5Y, "Share yield % per year on 5 years average", unit="$")),
-    (SchemaColumns.DIV_1Y, ColumnDefinition(SchemaColumns.DIV_1Y, "Total divident yield over 1 year", unit="$")),
-    (SchemaColumns.CUR_DIV, ColumnDefinition(SchemaColumns.CUR_DIV, "Most recent divident yield", unit="$")),
-    (SchemaColumns.NUM_DIV_1Y, ColumnDefinition(SchemaColumns.NUM_DIV_1Y, "Number of divident payouts per year")),
-    (SchemaColumns.PAY_DATE, ColumnDefinition(SchemaColumns.PAY_DATE, "Date of next divident payment", unit="date")),
+    (SchemaColumns.PRICE, ColumnDefinition(SchemaColumns.PRICE,
+                                            "Current share price", unit="$")),
+    (SchemaColumns.FAIR_VALUE, ColumnDefinition(SchemaColumns.FAIR_VALUE,
+                                                 "Percent over/under valued relative to fair value using Peter Lynch method", unit="%", lower_is_better=True)),
+    (SchemaColumns.YIELD_1Y, ColumnDefinition(SchemaColumns.YIELD_1Y,
+                                               "Share yield % per year", unit="%")),
+    (SchemaColumns.YIELD_5Y, ColumnDefinition(SchemaColumns.YIELD_5Y,
+                                               "Share yield % per year on 5 years average", unit="$")),
+    (SchemaColumns.DIV_1Y, ColumnDefinition(SchemaColumns.DIV_1Y,
+                                             "Total divident yield over 1 year", unit="$", calc_sum=True)),
+    (SchemaColumns.CUR_DIV, ColumnDefinition(SchemaColumns.CUR_DIV,
+                                              "Most recent divident yield", unit="$")),
+    (SchemaColumns.NUM_DIV_1Y, ColumnDefinition(SchemaColumns.NUM_DIV_1Y,
+                                                 "Number of divident payouts per year")),
+    (SchemaColumns.PAY_DATE, ColumnDefinition(SchemaColumns.PAY_DATE,
+                                               "Date of next divident payment", unit="date", is_numeric=False)),
 
     # main divident sustainability info
-    (SchemaColumns.CHOWDER, ColumnDefinition(SchemaColumns.CHOWDER, "Dividend Yield + Dividend Growth Rate. Measures income + growth")),
-    (SchemaColumns.ROE, ColumnDefinition(SchemaColumns.ROE, "Return on equity. Capital efficiency", unit="%")),
-    (SchemaColumns.PAYOUT_RATIO, ColumnDefinition(SchemaColumns.PAYOUT_RATIO, "Anual divident to cashflow per share ratio, Lower is more sustainable", unit="%")),
-    (SchemaColumns.DEBT_CAPITAL, ColumnDefinition(SchemaColumns.DEBT_CAPITAL, "Debt to total capital. Lower is safer", unit="%")),
+    (SchemaColumns.CHOWDER, ColumnDefinition(SchemaColumns.CHOWDER,
+                                              "Dividend Yield + Dividend Growth Rate. Measures income + growth")),
+    (SchemaColumns.ROE, ColumnDefinition(SchemaColumns.ROE,
+                                          "Return on equity. Capital efficiency", unit="%")),
+    (SchemaColumns.PAYOUT_RATIO, ColumnDefinition(SchemaColumns.PAYOUT_RATIO,
+                                                   "Anual divident to cashflow per share ratio, Lower is more sustainable", unit="%")),
+    (SchemaColumns.DEBT_CAPITAL, ColumnDefinition(SchemaColumns.DEBT_CAPITAL,
+                                                   "Debt to total capital. Lower is safer", unit="%", lower_is_better=True)),
 
     # main divident growth info
-    (SchemaColumns.DGR_1Y, ColumnDefinition(SchemaColumns.DGR_1Y, "Dividend Growth Rate over 1 years", unit="%")),
-    (SchemaColumns.DGR_3Y, ColumnDefinition(SchemaColumns.DGR_3Y, "Dividend Growth Rate over 3 years", unit="%")),
-    (SchemaColumns.DGR_5Y, ColumnDefinition(SchemaColumns.DGR_5Y, "Dividend Growth Rate over 5 years", unit="%")),
-    (SchemaColumns.DGR_10Y, ColumnDefinition(SchemaColumns.DGR_10Y, "Dividend Growth Rate over 10 years", unit="%")),
-    (SchemaColumns.TTR_1Y, ColumnDefinition(SchemaColumns.TTR_1Y, "Total return over 1 year", unit="%")),
-    (SchemaColumns.TTR_3Y, ColumnDefinition(SchemaColumns.TTR_3Y, "Total return over 3 years", unit="%")),
-    (SchemaColumns.EPS_1Y, ColumnDefinition(SchemaColumns.EPS_1Y, "Earnings per share growth 1 year", unit="%")),
+    (SchemaColumns.DGR_1Y, ColumnDefinition(SchemaColumns.DGR_1Y,
+                                             "Dividend Growth Rate over 1 years", unit="%")),
+    (SchemaColumns.DGR_3Y, ColumnDefinition(SchemaColumns.DGR_3Y,
+                                             "Dividend Growth Rate over 3 years", unit="%")),
+    (SchemaColumns.DGR_5Y, ColumnDefinition(SchemaColumns.DGR_5Y,
+                                             "Dividend Growth Rate over 5 years", unit="%")),
+    (SchemaColumns.DGR_10Y, ColumnDefinition(SchemaColumns.DGR_10Y,
+                                              "Dividend Growth Rate over 10 years", unit="%")),
+    (SchemaColumns.TTR_1Y, ColumnDefinition(SchemaColumns.TTR_1Y,
+                                             "Total return over 1 year", unit="%")),
+    (SchemaColumns.TTR_3Y, ColumnDefinition(SchemaColumns.TTR_3Y,
+                                             "Total return over 3 years", unit="%")),
+    (SchemaColumns.EPS_1Y, ColumnDefinition(SchemaColumns.EPS_1Y,
+                                             "Earnings per share growth 1 year", unit="%")),
 
     # secondary evaluation parameters
-    (SchemaColumns.REVENUE_1Y, ColumnDefinition(SchemaColumns.REVENUE_1Y, "Revenue growth over last year", unit="%")),
-    (SchemaColumns.NPM, ColumnDefinition(SchemaColumns.NPM, "Net profit margin. Measures profitability", unit="%")),
-    (SchemaColumns.ROTC, ColumnDefinition(SchemaColumns.ROTC, "Return on total capital", unit="%")),
-    (SchemaColumns.CUR_R, ColumnDefinition(SchemaColumns.CUR_R, "Current ratio. Liquidity measure")),
-    (SchemaColumns.P_E, ColumnDefinition(SchemaColumns.P_E, "Price-to-earnings ratio. Valuation metric", unit="%")),
-    (SchemaColumns.P_BV, ColumnDefinition(SchemaColumns.P_BV, "Price-to-book value ratio", unit="%")),
-    (SchemaColumns.CF_SHARE, ColumnDefinition(SchemaColumns.CF_SHARE, "Cash flow per share", unit="$")),
-    (SchemaColumns.PEG, ColumnDefinition(SchemaColumns.PEG, "Price / Earnings to Growth ratio. Valuation adjusted for growth")),
+    (SchemaColumns.REVENUE_1Y, ColumnDefinition(SchemaColumns.REVENUE_1Y,
+                                                 "Revenue growth over last year", unit="%")),
+    (SchemaColumns.NPM, ColumnDefinition(SchemaColumns.NPM,
+                                          "Net profit margin. Measures profitability", unit="%")),
+    (SchemaColumns.ROTC, ColumnDefinition(SchemaColumns.ROTC,
+                                           "Return on total capital", unit="%")),
+    (SchemaColumns.CUR_R, ColumnDefinition(SchemaColumns.CUR_R,
+                                            "Current ratio. Liquidity measure")),
+    (SchemaColumns.P_E, ColumnDefinition(SchemaColumns.P_E,
+                                          "Price-to-earnings ratio. Valuation metric", unit="%", lower_is_better=True)),
+    (SchemaColumns.P_BV, ColumnDefinition(SchemaColumns.P_BV,
+                                           "Price-to-book value ratio", unit="%", lower_is_better=True)),
+    (SchemaColumns.CF_SHARE, ColumnDefinition(SchemaColumns.CF_SHARE,
+                                               "Cash flow per share", unit="$")),
+    (SchemaColumns.PEG, ColumnDefinition(SchemaColumns.PEG,
+                                          "Price / Earnings to Growth ratio. Valuation adjusted for growth", lower_is_better=True)),
 
     # secondary divident info
-    (SchemaColumns.FAIR_PRICE, ColumnDefinition(SchemaColumns.FAIR_PRICE, "Fair price estimate using Peter Lynch method", unit="$")),
-    (SchemaColumns.PRICE_LOW, ColumnDefinition(SchemaColumns.PRICE_LOW, "52-week low price", unit="$")),
-    (SchemaColumns.PRICE_HIGH, ColumnDefinition(SchemaColumns.PRICE_HIGH, "52-week high price", unit="$")),
-    (SchemaColumns.PREV_DIV, ColumnDefinition(SchemaColumns.PREV_DIV, "Previous divident yield", unit="$")),
-    (SchemaColumns.EX_DATE, ColumnDefinition(SchemaColumns.EX_DATE, "???", unit="date")),
+    (SchemaColumns.FAIR_PRICE, ColumnDefinition(SchemaColumns.FAIR_PRICE,
+                                                 "Fair price estimate using Peter Lynch method", unit="$")),
+    (SchemaColumns.PRICE_LOW, ColumnDefinition(SchemaColumns.PRICE_LOW,
+                                                "52-week low price", unit="$")),
+    (SchemaColumns.PRICE_HIGH, ColumnDefinition(SchemaColumns.PRICE_HIGH,
+                                                "52-week high price", unit="$")),
+    (SchemaColumns.PREV_DIV, ColumnDefinition(SchemaColumns.PREV_DIV,
+                                               "Previous divident yield", unit="$")),
+    (SchemaColumns.EX_DATE, ColumnDefinition(SchemaColumns.EX_DATE,
+                                             "???", unit="date", is_numeric=False)),
 
 ))
-
-
-SchemaColumns.LOWER_IS_BETTER = {
-    SchemaColumns.DEBT_CAPITAL,
-    SchemaColumns.P_BV,
-    SchemaColumns.P_E,
-    SchemaColumns.PEG,
-}
-
-SchemaColumns.FILTER_TOTAL_SUM = {
-    SchemaColumns.DIV_1Y,
-}
-
-SchemaColumns.IS_NOT_NUMERIC = {
-    SchemaColumns.SYMBOL
-}
-
 
 def schema_col_numeric_normalize(df, src_info, src_col_name, on_unexpected="warn"):
 

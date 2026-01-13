@@ -1,4 +1,4 @@
--
+
 def generate_thresholds(rows, output_path):
     columns = rows[0].keys()
     numeric_columns = defaultdict(list)

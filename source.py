@@ -1,7 +1,7 @@
 from schema import SchemaColumns
 
 
-class SupportedDataSources:
+class DVCSupportedDataSources:
     DRIPINVESTING = "dripinvesting"
 
 
@@ -40,7 +40,7 @@ class DataSource:
 class SourceDripInvesting(DataSource):
     def __init__(self):
 
-        self._name = SupportedDataSources.DRIPINVESTING
+        self._name = DVCSupportedDataSources.DRIPINVESTING
 
         self._delete_cols = {
             "Logo"

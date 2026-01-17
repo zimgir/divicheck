@@ -173,74 +173,78 @@ COL_DEFS = OrderedDict((
 
 ))
 
-def schema_col_numeric_normalize(df, src_info, src_col_name, on_unexpected="warn"):
+class DVCSchema:
 
-    src_col_allowed_symbols = src_info.get_col_allowed_symbols(src_col_name)
+    @staticmethod
+    def normalize_numeric_col(df, src_info, src_col_name, on_unexpected="warn"):
 
-    src_col_convert_col = src_info.get_col_convert_col_name(src_col_name)
+        src_col_allowed_symbols = src_info.get_col_allowed_symbols(src_col_name)
 
-    src_col_convert_factor = src_info.get_col_convert_factor(src_col_name)
+        src_col_convert_col = src_info.get_col_convert_col_name(src_col_name)
 
-    # check for unexpected symbols
-    s = df[src_col_name].astype(str)
+        src_col_convert_factor = src_info.get_col_convert_factor(src_col_name)
 
-    # remove always allowed numeric symbols
-    unexpected = s.str.replace(r"[\d\.\-,\s]", "", regex=True)
+        # check for unexpected symbols
+        s = df[src_col_name].astype(str)
 
-    # remove col allowed symbols such as units like $
-    for sym in src_col_allowed_symbols:
-        unexpected = unexpected.str.replace(sym, "", regex=False)
+        # remove always allowed numeric symbols
+        unexpected = s.str.replace(r"[\d\.\-,\s]", "", regex=True)
 
-    # check if anything unexpected left after removing all the expected
-    if unexpected.str.len().gt(0).any():
-        msg = f"Unexpected symbols in column '{src_col_name}' from source '{src_info.get_name()}'"
-        if on_unexpected == "error":
-            raise ValueError(msg)
-        elif on_unexpected == "warn":
-            print(f"\nWARNING: {msg}\n")
+        # remove col allowed symbols such as units like $
+        for sym in src_col_allowed_symbols:
+            unexpected = unexpected.str.replace(sym, "", regex=False)
 
-
-    # remove expected non numeric symbols such as units
-    for sym in src_col_allowed_symbols:
-        s = s.str.replace(sym, "", regex=False)
-
-    # remove all non numeric symbols - empty col turns into a NaN - as float
-    values = (
-        s.str.replace(r"[^\d\.\-]", "", regex=True)
-        .replace("", np.nan)
-        .astype(float)
-    )
-
-    # conversion logic for curency or %
-    if src_col_convert_col is not None:
-        values = values * df[src_col_convert_col].astype(float)
-    elif src_col_convert_factor is not None:
-        values = values * src_col_convert_factor
-
-    # write back normalized data
-    df[src_col_name] = values
+        # check if anything unexpected left after removing all the expected
+        if unexpected.str.len().gt(0).any():
+            msg = f"Unexpected symbols in column '{src_col_name}' from source '{src_info.get_name()}'"
+            if on_unexpected == "error":
+                raise ValueError(msg)
+            elif on_unexpected == "warn":
+                print(f"\nWARNING: {msg}\n")
 
 
-def schema_cols_normalize(df, src_info):
+        # remove expected non numeric symbols such as units
+        for sym in src_col_allowed_symbols:
+            s = s.str.replace(sym, "", regex=False)
 
-    # first delete all redundant cols according to src info
-    cols_to_delete = src_info.get_delete_cols()
+        # remove all non numeric symbols - empty col turns into a NaN - as float
+        values = (
+            s.str.replace(r"[^\d\.\-]", "", regex=True)
+            .replace("", np.nan)
+            .astype(float)
+        )
 
-    if len(cols_to_delete) > 0:
-        df = df.drop(cols_to_delete, axis=1)
+        # conversion logic for curency or %
+        if src_col_convert_col is not None:
+            values = values * df[src_col_convert_col].astype(float)
+        elif src_col_convert_factor is not None:
+            values = values * src_col_convert_factor
 
-    # normalize all columns for given source
-    for src_col_name, schema_col_name in src_info.get_col_names():
+        # write back normalized data
+        df[src_col_name] = values
 
-        col_def = SchemaColumns.DEFS[schema_col_name]
 
-        if col_def.is_numeric:
-            schema_col_numeric_normalize(df, src_info, src_col_name)
+    @staticmethod
+    def normalize_cols(df, src_info):
 
-        # rename src column to schema name
-        df = df.rename(columns={src_col_name: schema_col_name})
+        # first delete all redundant cols according to src info
+        cols_to_delete = src_info.get_delete_cols()
 
-        # update source metadata
-        col_def.src_info = src_info
+        if len(cols_to_delete) > 0:
+            df = df.drop(cols_to_delete, axis=1)
 
-    return df
+        # normalize all columns for given source
+        for src_col_name, schema_col_name in src_info.get_col_names():
+
+            col_def = SchemaColumns.DEFS[schema_col_name]
+
+            if col_def.is_numeric:
+                DVCSchema.normalize_numeric_col(df, src_info, src_col_name)
+
+            # rename src column to schema name
+            df = df.rename(columns={src_col_name: schema_col_name})
+
+            # update source metadata
+            col_def.src_info = src_info
+
+        return df

@@ -4,11 +4,13 @@ import os
 import argparse
 
 
+from utils import csv_save_df, json_save
+
 from source import DVCSupportedDataSources
 from preproc import DVCPreprocess
 from filter import DVCFilter
 from schema import *
-from utils import *
+
 from score import add_score_columns
 from fetch import add_beta_column, update_eps_column
 from filter import generate_thresholds, filter_with_thresholds
@@ -25,15 +27,21 @@ def divicheck_preproc(args):
 
     print(f"\n[PREPROC] Load data from {args.input} source: {args.source}\n")
 
-    df = DVCPreprocess.preprocess_data(args)
+    data = DVCPreprocess.preprocess_data(args)
 
-    DVCFilter.generate_thresholds(args, df)
+    thresholds = DVCFilter.generate_thresholds(args, data)
 
-    output_path = os.path.join(args.outdir, DEFAULT_STOCKS_DATA)
+    out_data_path = os.path.join(args.outdir, DEFAULT_STOCKS_DATA)
 
-    csv_save_df(output_path, df)
+    csv_save_df(out_data_path, data)
 
-    print(f"\n[PREPROC] Preprocessed CSV written to {args.output}\n")
+    print(f"\n[PREPROC] Preprocessed data written to {out_data_path}\n")
+
+    out_thresh_path = os.path.join(args.outdir, DEFAULT_STOCKS_THRESHOLDS)
+
+    json_save(out_thresh_path, thresholds)
+
+    print(f"\n[PREPROC] Preprocessed thresholds written to {out_thresh_path}\n")
 
 
 
@@ -62,11 +70,11 @@ if __name__ == "__main__":
 
     preproc_parser = subparsers.add_parser("preproc", help="Preprocess an existing stock data file from one of the supported sources into a common format and generate initial thresholds file for it")
 
-    preproc_parser.add_argument("-i", "--input", required=True, help="Input path for all divident stocks data file")
+    preproc_parser.add_argument("-i", "--input", required=True, help="Input path for divident stocks data file")
     preproc_parser.add_argument("-o", "--outdir", default=os.getcwd(), help="Output directory for preprocess outputs")
     preproc_parser.add_argument("-s", "--source", default=DEFAULT_PREPROC_SOURCE, help="Source of the input data for preprocessing")
-    preproc_parser.add_argument("-w", "--weights", help="Optional score weights JSON to adjust score calulations during preprocessing")
-    preproc_parser.add_argument("--dump-weights", action="store_true", help="Dump the used score weights as a configuration file")
+    preproc_parser.add_argument("-w", "--weights", help="Optional score weights file to adjust score calulations during preprocessing")
+    preproc_parser.add_argument("--dump-weights", action="store_true", help="Dump the used score weight file")
 
     preproc_parser.set_defaults(func=divicheck_preproc)
 

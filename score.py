@@ -88,62 +88,67 @@ def compute_safety_score(row, sector_stats):
     return sum(scores) / len(scores) if scores else 0.5
 
 
-def add_score_columns(args, data):
 
-    weights = load_weights(args)
 
-    col_weights = weights.get("columns", {})
-    value_weight = weights.get("value", 0.0)
-    safety_weight = weights.get("safety", 0.0)
 
-    sector_stats = {
-        col: sector_min_max(rows, col)
-        for col in col_weights
-    }
+class DVCScore:
 
-    safety_stats = {
-        col: sector_min_max(rows, col)
-        for col in COL_SAFETY_SCORE_INPUTS
-    }
+    def add_score_columns(args, df):
 
-    scored = []
+        weights = load_weights(args)
 
-    for row in rows:
-        total = 0.0
-        wsum = 0.0
+        col_weights = weights.get("columns", {})
+        value_weight = weights.get("value", 0.0)
+        safety_weight = weights.get("safety", 0.0)
 
-        for col, w in col_weights.items():
-            v = to_float(row.get(col))
-            if v is None:
-                continue
+        sector_stats = {
+            col: sector_min_max(rows, col)
+            for col in col_weights
+        }
 
-            norm = sector_normalize(v, row[COL_SECTOR], sector_stats[col])
+        safety_stats = {
+            col: sector_min_max(rows, col)
+            for col in COL_SAFETY_SCORE_INPUTS
+        }
 
-            if col in COL_LOWER_IS_BETTER:
-                norm = 1.0 - norm
+        scored = []
 
-            total += norm * abs(w)
-            wsum += abs(w)
+        for row in rows:
+            total = 0.0
+            wsum = 0.0
 
-        # valuation bonus
-        value_score = compute_value_score(row)
-        total += value_score * value_weight
-        wsum += value_weight
+            for col, w in col_weights.items():
+                v = to_float(row.get(col))
+                if v is None:
+                    continue
 
-        row[COL_VALUE_SCORE] = value_score
-        row.move_to_end(COL_VALUE_SCORE, last=False)
+                norm = sector_normalize(v, row[COL_SECTOR], sector_stats[col])
 
-        # safety proxy
-        safety_score = compute_safety_score(row, safety_stats)
-        total += safety_score * safety_weight
-        wsum += safety_weight
+                if col in COL_LOWER_IS_BETTER:
+                    norm = 1.0 - norm
 
-        row[COL_SAFETY_SCORE] = safety_score
-        row.move_to_end(COL_SAFETY_SCORE, last=False)
+                total += norm * abs(w)
+                wsum += abs(w)
 
-        row[COL_TOTAL_SCORE] = total # / wsum if wsum else 0.0 # add this if want normalized score
-        row.move_to_end(COL_TOTAL_SCORE, last=False)
+            # valuation bonus
+            value_score = compute_value_score(row)
+            total += value_score * value_weight
+            wsum += value_weight
 
-        scored.append(row)
+            row[COL_VALUE_SCORE] = value_score
+            row.move_to_end(COL_VALUE_SCORE, last=False)
 
-    return scored
+            # safety proxy
+            safety_score = compute_safety_score(row, safety_stats)
+            total += safety_score * safety_weight
+            wsum += safety_weight
+
+            row[COL_SAFETY_SCORE] = safety_score
+            row.move_to_end(COL_SAFETY_SCORE, last=False)
+
+            row[COL_TOTAL_SCORE] = total # / wsum if wsum else 0.0 # add this if want normalized score
+            row.move_to_end(COL_TOTAL_SCORE, last=False)
+
+            scored.append(row)
+
+        return scored

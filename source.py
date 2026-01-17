@@ -138,12 +138,17 @@ class SourceDripInvesting(DataSource):
             return 100.0
 
 
-class SourceFactory:
+SRC_DEFS = {
+    "dripinvesting" : SourceDripInvesting
+}
 
-    SRC_DEFS = {
-        "dripinvesting" : SourceDripInvesting
-    }
+
+class DVCSource:
 
     @staticmethod
     def get_source(src_name):
-        return SourceFactory.SRC_DEFS[src_name]()
+
+        if src_name not in SRC_DEFS:
+            raise Exception(f"Unsupported preprocess data source: {src_name}")
+
+        return SRC_DEFS[src_name]()

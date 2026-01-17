@@ -1,7 +1,10 @@
+import os
 
 from source import DVCSupportedDataSources
 
 from utils import csv_load_df
+from source import DVCSource
+from schema import DVCSchema
 
 
 def add_sector_rank_and_sort(df):
@@ -19,30 +22,21 @@ def add_sector_rank_and_sort(df):
 
     return df
 
-def preprocess_data(data_path, data_source):
-
-    #df = add_beta_column(df)
-
-    #df = update_eps_column(df)
-
-    #df = add_score_columns(df)
-
-    #df = add_sector_rank_and_sort(df)
-
-    return df
 
 
-def preproc_dripinvesting(data_path):
+def preproc_dripinvesting(args, src_info):
 
-    src_data = csv_load_df(data_path)
+    df = csv_load_df(args.input)
 
-    #df = add_beta_column(df)
+    df = DVCSchema.normalize_cols(df, src_info)
 
-    #df = update_eps_column(df)
+    #df = add_beta_column(df) #TODO
 
-    #df = add_score_columns(df)
+    #df = update_eps_column(df) #TODO
 
-    #df = add_sector_rank_and_sort(df)
+    df = add_score_columns(df)
+
+    df = add_sector_rank_and_sort(df)
 
     return df
 
@@ -59,7 +53,9 @@ class DVCPreprocess:
         if args.source not in PREPROC_HANDLERS:
             raise Exception(f"Unsupported preprocess data source: {args.source}")
 
-        df = PREPROC_HANDLERS[args.source](args)
+        src_info = DVCSource.get_source(args.source)
+
+        df = PREPROC_HANDLERS[args.source](args, src_info)
 
         return df
 

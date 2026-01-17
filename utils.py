@@ -1,5 +1,6 @@
 import re
 import csv
+import json
 
 from collections import OrderedDict
 
@@ -43,3 +44,8 @@ def csv_load_df(path):
 
 def csv_save_df(path, df):
     df.to_csv(path, index=False)
+
+
+def json_save(path, obj):
+    with open(path, "w") as dst:
+        json.dump(obj, dst, indent=2)

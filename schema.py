@@ -176,6 +176,14 @@ COL_DEFS = OrderedDict((
 class DVCSchema:
 
     @staticmethod
+    def get_col_def(col_name):
+
+        if col_name not in COL_DEFS:
+            raise Exception(f"Col name: {col_name} is not in schema")
+
+        return COL_DEFS[col_name]
+
+    @staticmethod
     def normalize_numeric_col(df, src_info, src_col_name, on_unexpected="warn"):
 
         src_col_allowed_symbols = src_info.get_col_allowed_symbols(src_col_name)

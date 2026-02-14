@@ -39,6 +39,7 @@ class DataSource:
 
 class SourceDripInvesting(DataSource):
     def __init__(self):
+        super().__init__()
 
         self._name = DVCSupportedDataSources.DRIPINVESTING
 
@@ -132,6 +133,9 @@ class SourceDripInvesting(DataSource):
 
         if src_col_name in self._x_cols:
             return ("x",)
+
+        return ()
+
 
     def get_col_convert_factor(self, src_col_name):
         if src_col_name in self._x_cols:

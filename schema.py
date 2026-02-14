@@ -5,7 +5,6 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from source import SRC_DEFS
 
 # container for column definition data
 class ColumnDefinition:
@@ -44,7 +43,7 @@ class SchemaColumns:
     # main divident sustainability info
     CHOWDER = "Chowder"
     ROE = "ROE (%)"
-    PAYOUT_RATIO = "Payout Div/CF (%)"
+    PAYOUT_RATIO = "Payout Div/EPS (%)"
     DEBT_CAPITAL = "Debt/Capital (%)"
 
     # main divident growth info
@@ -121,7 +120,7 @@ COL_DEFS = OrderedDict((
     (SchemaColumns.ROE, ColumnDefinition(SchemaColumns.ROE,
                                           "Return on equity. Capital efficiency", unit="%")),
     (SchemaColumns.PAYOUT_RATIO, ColumnDefinition(SchemaColumns.PAYOUT_RATIO,
-                                                   "Anual divident to cashflow per share ratio, Lower is more sustainable", unit="%")),
+                                                   "Anual divident to cashflow per share ratio, Lower is more sustainable", unit="%", lower_is_better=True)),
     (SchemaColumns.DEBT_CAPITAL, ColumnDefinition(SchemaColumns.DEBT_CAPITAL,
                                                    "Debt to total capital. Lower is safer", unit="%", lower_is_better=True)),
 
@@ -176,6 +175,10 @@ COL_DEFS = OrderedDict((
 class DVCSchema:
 
     @staticmethod
+    def get_col_order():
+        return COL_DEFS.keys()
+
+    @staticmethod
     def get_col_def(col_name):
 
         if col_name not in COL_DEFS:
@@ -204,7 +207,7 @@ class DVCSchema:
 
         # check if anything unexpected left after removing all the expected
         if unexpected.str.len().gt(0).any():
-            msg = f"Unexpected symbols in column '{src_col_name}' from source '{src_info.get_name()}'"
+            msg = f"Unexpected symbols\n'{unexpected}'\nin column '{src_col_name}' from source '{src_info.get_name()}'"
             if on_unexpected == "error":
                 raise ValueError(msg)
             elif on_unexpected == "warn":
@@ -244,7 +247,7 @@ class DVCSchema:
         # normalize all columns for given source
         for src_col_name, schema_col_name in src_info.get_col_names():
 
-            col_def = SchemaColumns.DEFS[schema_col_name]
+            col_def = DVCSchema.get_col_def(schema_col_name)
 
             if col_def.is_numeric:
                 DVCSchema.normalize_numeric_col(df, src_info, src_col_name)

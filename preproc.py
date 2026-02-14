@@ -4,18 +4,21 @@ from source import DVCSupportedDataSources
 
 from utils import csv_load_df
 from source import DVCSource
-from schema import DVCSchema
+from schema import DVCSchema, SchemaColumns
+from score import DVCScore
 
 
-def add_sector_rank_and_sort(df):
+def add_sector_rank_and_sort_by_sector(df):
 
-    df["SectorRank"] = (
-        df.groupby(COL_SECTOR)[COL_TOTAL_SCORE]
+    # add sector rank column
+    df[SchemaColumns.SECTOR_RANK] = (
+        df.groupby(SchemaColumns.SECTOR)[SchemaColumns.TOTAL_SCORE]
         .rank(method="dense", ascending=False)
     )
 
+    # sort by sector and sector rank
     df = df.sort_values(
-        by=[COL_SECTOR, COL_SECTOR_RANK],
+        by=[SchemaColumns.SECTOR, SchemaColumns.SECTOR_RANK],
         na_position="last"
     ).reset_index(drop=True)
 
@@ -34,9 +37,12 @@ def preproc_dripinvesting(args, src_info):
 
     #df = update_eps_column(df) #TODO
 
-    df = add_score_columns(df)
+    df = DVCScore.add_score_columns(args, df)
 
-    df = add_sector_rank_and_sort(df)
+    df = add_sector_rank_and_sort_by_sector(df)
+
+    # reorder columns to to schema order
+    df = df.reindex(columns=DVCSchema.get_col_order())
 
     return df
 

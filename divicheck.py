@@ -8,12 +8,9 @@ from utils import csv_save_df, json_save
 
 from source import DVCSupportedDataSources
 from preproc import DVCPreprocess
-from filter import DVCFilter
+#from filter import DVCFilter
 from schema import *
 
-from score import add_score_columns
-from fetch import add_beta_column, update_eps_column
-from filter import generate_thresholds, filter_with_thresholds
 
 
 DEFAULT_PREPROC_SOURCE = DVCSupportedDataSources.DRIPINVESTING
@@ -29,20 +26,19 @@ def divicheck_preproc(args):
 
     data = DVCPreprocess.preprocess_data(args)
 
-    thresholds = DVCFilter.generate_thresholds(args, data)
-
     out_data_path = os.path.join(args.outdir, DEFAULT_STOCKS_DATA)
 
     csv_save_df(out_data_path, data)
 
     print(f"\n[PREPROC] Preprocessed data written to {out_data_path}\n")
 
-    out_thresh_path = os.path.join(args.outdir, DEFAULT_STOCKS_THRESHOLDS)
+    # thresholds = DVCFilter.generate_thresholds(args, data)
 
-    json_save(out_thresh_path, thresholds)
+    # out_thresh_path = os.path.join(args.outdir, DEFAULT_STOCKS_THRESHOLDS)
 
-    print(f"\n[PREPROC] Preprocessed thresholds written to {out_thresh_path}\n")
+    # json_save(out_thresh_path, thresholds)
 
+    # print(f"\n[PREPROC] Preprocessed thresholds written to {out_thresh_path}\n")
 
 
 def divicheck_filter(args):
@@ -80,9 +76,9 @@ if __name__ == "__main__":
 
     filter_parser = subparsers.add_parser("filter", help="Filter divident stock CSV file uisng input thresholds")
 
-    preproc_parser.add_argument("-i", "--input", default=DEFAULT_STOCKS_DATA, help="Input path for preprocessed divident stocks CSV file")
-    preproc_parser.add_argument("-o", "--output", default=DEFAULT_STOCKS_FILTERED_DATA, help="Output path for filtered divident stocks CSV file")
-    preproc_parser.add_argument("-t", "--thresholds", default=DEFAULT_STOCKS_THRESHOLDS, help="Input path for thresholds JSON which configures the filters")
+    filter_parser.add_argument("-i", "--input", default=DEFAULT_STOCKS_DATA, help="Input path for preprocessed divident stocks CSV file")
+    filter_parser.add_argument("-o", "--output", default=DEFAULT_STOCKS_FILTERED_DATA, help="Output path for filtered divident stocks CSV file")
+    filter_parser.add_argument("-t", "--thresholds", default=DEFAULT_STOCKS_THRESHOLDS, help="Input path for thresholds JSON which configures the filters")
 
     filter_parser.set_defaults(func=divicheck_filter)
 

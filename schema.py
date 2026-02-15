@@ -206,8 +206,12 @@ class DVCSchema:
             unexpected = unexpected.str.replace(sym, "", regex=False)
 
         # check if anything unexpected left after removing all the expected
-        if unexpected.str.len().gt(0).any():
+        found_unexpected = unexpected.str.len().gt(0)
+
+        if found_unexpected.any():
+            unexpected = unexpected[found_unexpected]
             msg = f"Unexpected symbols\n'{unexpected}'\nin column '{src_col_name}' from source '{src_info.get_name()}'"
+
             if on_unexpected == "error":
                 raise ValueError(msg)
             elif on_unexpected == "warn":

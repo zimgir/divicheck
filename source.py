@@ -94,9 +94,9 @@ class SourceDripInvesting(DataSource):
             "Annualized",
             "Previous Div",
             "Low",
-            "High"
-            "FV (Peter Lynch)"
-            "CF/Share"
+            "High",
+            "FV (Peter Lynch)",
+            "CF/Share",
         }
 
         self._pct_cols = {
@@ -114,27 +114,30 @@ class SourceDripInvesting(DataSource):
             "NPM",
             "ROE",
             "Debt/Capital",
-            "ROTC"
+            "ROTC",
 
         }
 
         self._x_cols = {
             "P/E",
-            "P/BV"
+            "P/BV",
         }
 
 
     def get_col_allowed_symbols(self, src_col_name):
+
+        base_allowed = ["nan"]
+
         if src_col_name in self._usd_cols:
-            return ("$",)
+            base_allowed.append("$")
 
         if src_col_name in self._pct_cols:
-            return ("%",)
+            base_allowed.append("%")
 
         if src_col_name in self._x_cols:
-            return ("x",)
+            base_allowed.append("x")
 
-        return ()
+        return base_allowed
 
 
     def get_col_convert_factor(self, src_col_name):

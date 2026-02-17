@@ -31,7 +31,7 @@ DEFAULT_SCORE_WEIGHTS = {
 
     # derrived scores
     SCORE_WEIGHT_SAFETY : 1.2,
-    SCORE_WEIGHT_VALUE: 0.8,
+    SCORE_WEIGHT_VALUE: 1.0,
 }
 
 
@@ -91,17 +91,25 @@ def get_col_sector_stats(df, col_name, stats_cache):
     return col_stats_per_sector
 
 
-def normalize_to_sector(val, sector_stats):
+def normalize_vals_to_sector(vals, sector_stats):
+
+    # default normalized values series
+    norm_vals = pd.Series(0.5, index=vals.index)
+
+    if sector_stats is None:
+        return norm_vals
 
     sector_min = sector_stats["min"]
     sector_max = sector_stats["max"]
 
     denom = (sector_max - sector_min)
+
     if denom == 0:
-        return 0.0
-    else:
-        norm_val = (val - sector_min) / denom
-        return norm_val
+        return norm_vals
+
+    norm_vals.loc[vals.notna()] = (vals - sector_min) / denom
+
+    return norm_vals
 
 
 def normalize_rows_to_sector(df, col_vals, col_stats_per_sector):
@@ -111,25 +119,29 @@ def normalize_rows_to_sector(df, col_vals, col_stats_per_sector):
 
     for sector, idx in df.groupby(SchemaColumns.SECTOR).groups.items():
 
-        sector_stats = col_stats_per_sector[sector]
+        sector_stats = col_stats_per_sector.get(sector, None)
 
-        norm.loc[idx] = normalize_to_sector(col_vals.loc[idx], sector_stats)
+        norm.loc[idx] = normalize_vals_to_sector(col_vals.loc[idx], sector_stats)
 
     return norm
 
 
-def compute_value_score(df, clip_min=50.0, clip_max=50.0):
+def compute_value_score(df, clip_min=-50.0, clip_max=50.0):
+
+    if clip_max <= clip_min:
+        raise ValueError(f"invalid clip min: {clip_min} max: {clip_max}")
+
     fv = df[SchemaColumns.FAIR_VALUE]
 
     # default score when fv is missing
     score = pd.Series(0.5, index=df.index)
 
-    # clamp to [-50, 50]
+    # clamp
     fv = fv.clip(lower=clip_min, upper=clip_max)
 
     # compute score where fv is valid
     mask = fv.notna()
-    score[mask] = 1.0 - (fv[mask] + 50.0) / 100.0
+    score[mask] = 1.0 - (fv[mask] - clip_min) / (clip_max - clip_min)
 
     return score
 
@@ -149,7 +161,6 @@ def add_payout_column(df):
 
 
 def compute_safety_score(df, stats_cache):
-    scores = []
 
     df = add_payout_column(df)
 
@@ -160,6 +171,9 @@ def compute_safety_score(df, stats_cache):
         SchemaColumns.CF_SHARE,
         SchemaColumns.PAYOUT_RATIO
     }
+
+    total = pd.Series(0.0, index=df.index)
+    wsum  = pd.Series(0.0, index=df.index)
 
     for col in safety_score_cols:
 
@@ -175,9 +189,12 @@ def compute_safety_score(df, stats_cache):
         if col_def.lower_is_better:
             norm = 1.0 - norm
 
-        scores.append(norm)
+        mask = norm.notna()
+        total.loc[mask] += norm[mask]
+        wsum.loc[mask]  += 1 # TODO: use custom weights for safety score instead of uniform?
 
-    total_safety_score = sum(scores) / len(scores)
+
+    total_safety_score = total / wsum
 
     return total_safety_score
 
@@ -216,13 +233,17 @@ class DVCScore:
 
         # valuation score for all rows at once
         value_score = compute_value_score(df)
-        total += value_score * value_weight
-        wsum  += value_weight
+
+        mask = value_score.notna()
+        total.loc[mask] += value_score[mask] * value_weight
+        wsum.loc[mask]  += value_weight
 
         # safety score for all rows at once
         safety_score = compute_safety_score(df, stats_cache)
-        total += safety_score * safety_weight
-        wsum  += safety_weight
+
+        mask = safety_score.notna()
+        total.loc[mask] += safety_score[mask] * safety_weight
+        wsum.loc[mask]  += safety_weight
 
         # write result columns to df
         df[SchemaColumns.VALUE_SCORE]  = value_score

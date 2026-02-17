@@ -97,16 +97,19 @@ COL_DEFS = OrderedDict((
     (SchemaColumns.INDUSTRY, ColumnDefinition(SchemaColumns.INDUSTRY, "Company industry", is_numeric=False)),
 
     # main divident info
+    (SchemaColumns.YIELD_1Y, ColumnDefinition(SchemaColumns.YIELD_1Y,
+                                               "Share divident yield % per year", unit="%")),
+    (SchemaColumns.YIELD_5Y, ColumnDefinition(SchemaColumns.YIELD_5Y,
+                                               "Share yield % per year on 5 years average", unit="$")),
+
+    (SchemaColumns.DIV_1Y, ColumnDefinition(SchemaColumns.DIV_1Y,
+                                             "Total divident yield over 1 year", unit="$", calc_sum=True)),
     (SchemaColumns.PRICE, ColumnDefinition(SchemaColumns.PRICE,
                                             "Current share price", unit="$")),
     (SchemaColumns.FAIR_VALUE, ColumnDefinition(SchemaColumns.FAIR_VALUE,
                                                  "Percent over/under valued relative to fair value using Peter Lynch method", unit="%", lower_is_better=True)),
-    (SchemaColumns.YIELD_1Y, ColumnDefinition(SchemaColumns.YIELD_1Y,
-                                               "Share yield % per year", unit="%")),
-    (SchemaColumns.YIELD_5Y, ColumnDefinition(SchemaColumns.YIELD_5Y,
-                                               "Share yield % per year on 5 years average", unit="$")),
-    (SchemaColumns.DIV_1Y, ColumnDefinition(SchemaColumns.DIV_1Y,
-                                             "Total divident yield over 1 year", unit="$", calc_sum=True)),
+
+
     (SchemaColumns.CUR_DIV, ColumnDefinition(SchemaColumns.CUR_DIV,
                                               "Most recent divident yield", unit="$")),
     (SchemaColumns.NUM_DIV_1Y, ColumnDefinition(SchemaColumns.NUM_DIV_1Y,

@@ -90,13 +90,14 @@ def cmd_stats(args) -> int:
 
 
 def cmd_symbols(args) -> int:
-    import requests
+    from db.fetcher import DBDataFetcher
 
-    r = requests.get("https://scanner.tradingview.com/america/scan", timeout=30)
-    data = r.json()["data"]
-    symbols = [item["s"] for item in data]
-    Path("symbols_all.txt").write_text("\n".join(symbols))
+    fetcher = DBDataFetcher()
+    symbols = fetcher.fetch_all_symbols()
     print(f"saved {len(symbols)} symbols to symbols_all.txt")
+
+    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols)
+    print(f"saved {len(dividend_symbols)} dividend symbols to symbols_dividend.txt")
     return 0
 
 

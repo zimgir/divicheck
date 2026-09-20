@@ -357,3 +357,85 @@ def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[d
         if sleep and (i + 1) % 10 == 0:
             time.sleep(sleep)
     return rows
+
+
+class DBDataFetcher:
+    def fetch_all_symbols(self, output_path: str = "symbols_all.txt") -> list[str]:
+        import requests
+        from pathlib import Path
+        r = requests.get("https://scanner.tradingview.com/america/scan", timeout=30)
+        # remove exchange prefix, then split by / to remove suffixes (e.g., RNR/PG -> RNR)
+        symbols = [item["s"].split(":")[-1].split("/")[0] for item in r.json()["data"]]
+        Path(output_path).write_text("\n".join(symbols))
+        return symbols
+
+
+    def filter_consecutive_dividend_symbols(self, symbols: list[str], seq_years: int = 5, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
+        import time
+        import pandas as pd
+        import yfinance as yf
+        from pathlib import Path
+
+        dividend_symbols = []
+        out = Path(output_path)
+        if out.exists():
+            out.unlink()
+
+        # 1. Clean symbols: Strip exchange prefix (e.g., "NYSE:HKD" -> "HKD")
+        clean_symbols = [s.split(":")[-1] for s in symbols]
+
+        # 2. Process in manageable batch sizes
+        batch_size = 40
+        current_year = datetime.now().year
+
+        for i in range(0, len(clean_symbols), batch_size):
+            batch = clean_symbols[i : i + batch_size]
+
+            try:
+                # Initialize bulk ticker instances
+                tickers_obj = yf.Tickers(" ".join(batch))
+
+                for sym in batch:
+                    try:
+                        ticker = tickers_obj.tickers[sym]
+                        divs = ticker.dividends
+
+                        if not divs.empty:
+                            # Extract sorted list of unique completed historical years with actual payouts
+                            paying_years = sorted([
+                                y for y in divs[divs > 0].index.year.unique() if y < current_year
+                            ])
+
+                            # 3. Calculate the maximum consecutive streak
+                            max_streak = 0
+                            current_streak = 0
+                            prev_year = None
+
+                            for year in paying_years:
+                                if prev_year is None or year == prev_year + 1:
+                                    current_streak += 1
+                                else:
+                                    current_streak = 1  # Reset streak if there's a gap year
+
+                                max_streak = max(max_streak, current_streak)
+                                prev_year = year
+
+                            # Add symbol if the longest streak is at least 5 years
+                            if max_streak >= seq_years:
+                                dividend_symbols.append(sym)
+                                with open(out, "a") as f:
+                                    f.write(sym + "\n")
+
+                    except Exception as e:
+                        log_error(f"{sym} inner consecutive filter fail: {e}")
+
+            except Exception as e:
+                log_error(f"Batch processing failed for {batch}: {e}")
+                time.sleep(5.0)  # Extended backoff recovery
+                continue
+
+            # 4. Rate limit throttle between sequential historical data requests
+            if sleep and (i + batch_size < len(clean_symbols)):
+                time.sleep(sleep)
+
+        return dividend_symbols

@@ -89,6 +89,17 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def cmd_symbols(args) -> int:
+    import requests
+
+    r = requests.get("https://scanner.tradingview.com/america/scan", timeout=30)
+    data = r.json()["data"]
+    symbols = [item["s"] for item in data]
+    Path("symbols_all.txt").write_text("\n".join(symbols))
+    print(f"saved {len(symbols)} symbols to symbols_all.txt")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="db_cli")
     ap.add_argument("--db", default=str(DB_PATH))
@@ -100,10 +111,11 @@ def main(argv=None) -> int:
         p.add_argument("--sleep", type=float, default=1.0)
         if name == "update":
             p.add_argument("--prune", action="store_true")
+    sub.add_parser("symbols")
     ps = sub.add_parser("stats")
     ps.add_argument("--db", default=str(DB_PATH))
     args = ap.parse_args(argv)
-    return {"rebuild": cmd_rebuild, "update": cmd_update, "stats": cmd_stats}[args.cmd](args)
+    return {"rebuild": cmd_rebuild, "update": cmd_update, "stats": cmd_stats, "symbols": cmd_symbols}[args.cmd](args)
 
 
 if __name__ == "__main__":

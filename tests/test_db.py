@@ -7,8 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from db.connection import get_connection, init_db  # noqa: E402
-from db.repository import upsert_many  # noqa: E402
+from db.sqldb_controller import SQLDBController
 
 FIXTURES = [
     {"SYMBOL": "AAA", "COMPANY": "A Co", "SECTOR": "Energy", "YIELD_1Y": 0.05, "DGR_5Y": 0.07,
@@ -18,12 +17,13 @@ FIXTURES = [
 ]
 
 
-def populate(con: sqlite3.Connection) -> None:
-    init_db(con)
-    upsert_many(con, FIXTURES)
+def populate(db: SQLDBController) -> None:
+    db.init_db()
+    db.upsert_many(FIXTURES)
 
 
-def verify(con: sqlite3.Connection) -> list[str]:
+def verify(db: SQLDBController) -> list[str]:
+    con = db.get_connection()
     errs = []
     rows = con.execute("SELECT * FROM stocks").fetchall()
     if not rows:
@@ -49,7 +49,8 @@ def verify(con: sqlite3.Connection) -> list[str]:
     return errs
 
 
-def stats(con: sqlite3.Connection) -> None:
+def stats(db: SQLDBController) -> None:
+    con = db.get_connection()
     total = con.execute("SELECT COUNT(*) c FROM stocks").fetchone()["c"]
     print(f"rows: {total}")
     for r in con.execute("SELECT SECTOR, COUNT(*) c FROM stocks GROUP BY SECTOR ORDER BY c DESC"):
@@ -66,11 +67,10 @@ def stats(con: sqlite3.Connection) -> None:
 
 
 def selftest() -> int:
-    con = sqlite3.connect(":memory:")
-    con.row_factory = sqlite3.Row
-    populate(con)
-    errs = verify(con)
-    stats(con)
+    db = SQLDBController(":memory:")
+    populate(db)
+    errs = verify(db)
+    stats(db)
     if errs:
         print("FAIL:", *errs, sep="\n  ")
         return 1
@@ -87,10 +87,10 @@ def selftest() -> int:
 
 def main() -> int:
     if len(sys.argv) > 1:
-        con = get_connection(sys.argv[1])
+        db = SQLDBController(sys.argv[1])
         try:
-            stats(con)
-            errs = verify(con)
+            stats(db)
+            errs = verify(db)
         except sqlite3.OperationalError as e:
             print(f"verify fail: {e}")
             return 1

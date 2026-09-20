@@ -7,9 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from db.connection import get_connection, init_db  # noqa: E402
-from db.repository import delete_missing, upsert_many  # noqa: E402
-from db.schema import DROP_TABLE_SQL  # noqa: E402
+from db.sqldb_controller import SQLDBController
 
 DB_PATH = Path(__file__).resolve().parent / "divicheck.db"
 
@@ -45,12 +43,13 @@ def cmd_rebuild(args) -> int:
     symbols = load_symbols(args.symbols)
     print(f"fetch {len(symbols)} symbols...")
     rows = fetch_all(symbols, sleep=args.sleep)
-    con = get_connection(args.db)
+    db = SQLDBController(args.db)
+    con = db.get_connection()
     with con:
-        con.execute(DROP_TABLE_SQL)
-        init_db(con)
+        con.execute(db.DROP_TABLE_SQL)
+        db.init_db()
         if rows:
-            upsert_many(con, rows)
+            db.upsert_many(rows)
     print(f"rebuild done: {len(rows)}/{len(symbols)} payers stored -> {args.db}")
     return 0
 
@@ -60,16 +59,17 @@ def cmd_update(args) -> int:
 
     symbols = load_symbols(args.symbols)
     rows = fetch_all(symbols, sleep=args.sleep)
-    con = get_connection(args.db)
-    init_db(con)
-    n = upsert_many(con, rows) if rows else 0
-    pruned = delete_missing(con, symbols) if args.prune else 0
+    db = SQLDBController(args.db)
+    db.init_db()
+    n = db.upsert_many(rows) if rows else 0
+    pruned = db.delete_missing(symbols) if args.prune else 0
     print(f"update done: {n} upserted, {pruned} pruned -> {args.db}")
     return 0
 
 
 def cmd_stats(args) -> int:
-    con = get_connection(args.db)
+    db = SQLDBController(args.db)
+    con = db.get_connection()
     try:
         total = con.execute("SELECT COUNT(*) c FROM stocks").fetchone()["c"]
     except sqlite3.OperationalError:

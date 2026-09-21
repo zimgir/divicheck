@@ -1,6 +1,7 @@
 """SQLDBController - unified database layer for stock data."""
 
 import sqlite3
+import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Optional
 from db import schema
@@ -49,6 +50,14 @@ class SQLDBController:
         with con:
             con.execute(self.DROP_TABLE_SQL)
             self.init_db()
+
+    def upsert_from_csv(self, csv_path: Path) -> int:
+        if not csv_path.exists():
+            return 0
+        df = pd.read_csv(csv_path)
+        # Convert NaN to None for SQL
+        rows = df.where(pd.notnull(df), None).to_dict('records')
+        return self.upsert_many(rows)
 
     def upsert_many(self, rows: List[Dict[str, any]]) -> int:
         if not rows:

@@ -183,7 +183,7 @@ def _ttr(ticker, dividends) -> tuple:
                 return float(s[s.index >= (idx[-1] - pd.Timedelta(days=days))].sum())
             except Exception:
                 return 0.0
-        
+
         p1, p3 = price_asof(365), price_asof(365 * 3)
         return (
             calc_total_return(p1, now, div_asof(365)),
@@ -323,31 +323,6 @@ def fetch_symbol(symbol: str) -> dict | None:
         return None
 
 
-def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[dict]:
-    """Two-pass: cheap info scan filters payers, then full fetch."""
-    logger = DBLogger.get_logger("fetch_all", reset=True)
-    symbols = [s.strip().upper() for s in symbols if s and s.strip()]
-    payers: list[str] = []
-    for i in range(0, len(symbols), batch):
-        for sym in symbols[i : i + batch]:
-            try:
-                info = DBDataFetcher._retry_on_rate_limit(lambda s=sym: yf.Ticker(s).info or {})
-                if is_payer(info):
-                    payers.append(sym)
-                else:
-                    logger.error(f"{sym} skip: non-payer")
-            except Exception as e:
-                logger.error(f"{sym} scan fail: {e}")
-        if sleep and i + batch < len(symbols):
-            time.sleep(sleep)
-    rows: list[dict] = []
-    for i, sym in enumerate(payers):
-        row = fetch_symbol(sym)
-        if row:
-            rows.append(row)
-        if sleep and (i + 1) % 10 == 0:
-            time.sleep(sleep)
-    return rows
 
 
 class DBDataFetcher:
@@ -359,13 +334,15 @@ class DBDataFetcher:
                 return fn()
             except Exception as e:
                 if "429" in str(e):
+                    print(f"Rate limit hit (429). Retrying in 60s. Attempt {i+1}/{attempts}")
                     time.sleep(60)
                     continue
+                print(f"Error on attempt {i+1}/{attempts}: {e}")
                 if i == attempts - 1:
                     raise
                 time.sleep(delay)
                 delay *= 2
-        raise Exception("Max retries exceeded")
+        raise Exception("Max rate limit retries exceeded")
 
 
     def fetch_all_symbols(self, output_path: str = "symbols_all.txt") -> list[str]:
@@ -432,3 +409,38 @@ class DBDataFetcher:
             logger.info(f"Done processing {len(dividend_symbols)} symbols")
 
             return dividend_symbols
+
+    def fetch_db_rows(self, symbols: list[str], output_csv: Path, batch_size: int = 40, sleep: float = 1.0) -> Path:
+        """Fetch/calculate in batches, write directly to intermediate CSV."""
+
+        logger = DBLogger.get_logger("fetch_db_rows", reset=True)
+
+        with log_streams_to(logger):
+            logger.info(f"Start fetching {len(symbols)} symbols. Output: {output_csv}")
+
+            # Setup CSV
+            first = True
+            if output_csv.exists():
+                output_csv.unlink()
+
+            for i in range(0, len(symbols), batch_size):
+                batch = symbols[i : i + batch_size]
+
+                rows = []
+                for sym in batch:
+                    row = fetch_symbol(sym)
+                    if row:
+                        rows.append(row)
+
+                if rows:
+                    df = pd.DataFrame(rows)
+                    # Write to CSV
+                    df.to_csv(output_csv, mode='a', index=False, header=first)
+                    first = False
+
+                DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols))
+                if sleep and (i + batch_size < len(symbols)):
+                    time.sleep(sleep)
+
+            logger.info(f"Done fetching. Saved to {output_csv}")
+            return output_csv

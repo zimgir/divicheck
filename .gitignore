@@ -3,11 +3,14 @@
 
 __pycache__/
 
+.db/
+.logs/
+
 *.csv
 *.json
 *.db
 *.db-wal
 *.db-shm
-db/fetch_errors.log
+
 
 !_hasolidit_thresholds.json

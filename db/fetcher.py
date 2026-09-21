@@ -1,12 +1,34 @@
+import sys
 import time
 import pandas as pd
 import yfinance as yf
 import requests
+import logging
+import contextlib
 
 from datetime import datetime, timezone
 from pathlib import Path
 
-from db import DB_DIR
+from db.logger import DBLogger, log_streams_to
+
+class LoggerStream:
+    def __init__(self, logger, original_stream, is_error=False):
+        self.logger = logger
+        self.orig = original_stream
+        self.is_error = is_error
+
+    def write(self, msg):
+        self.orig.write(msg)
+        for line in msg.splitlines():
+            clean = line.strip()
+            if clean:
+                if self.is_error:
+                    self.logger.error(clean)
+                else:
+                    self.logger.info(clean)
+
+    def flush(self):
+        self.orig.flush()
 
 # ---- pure calc fns (no network) ----
 
@@ -136,6 +158,7 @@ def _norm_yield(raw, cur_div, price):
 
 def _ttr(ticker, dividends) -> tuple:
     """(ttr_1y, ttr_3y) from single 3y history call."""
+    logger = DBLogger.get_logger("fetch_all", reset=False)
     try:
         hist = DBDataFetcher._retry_on_rate_limit(lambda: ticker.history(period="3y", auto_adjust=False))
         if hist is None or len(hist) == 0:
@@ -160,14 +183,14 @@ def _ttr(ticker, dividends) -> tuple:
                 return float(s[s.index >= (idx[-1] - pd.Timedelta(days=days))].sum())
             except Exception:
                 return 0.0
-
+        
         p1, p3 = price_asof(365), price_asof(365 * 3)
         return (
             calc_total_return(p1, now, div_asof(365)),
             calc_total_return(p3, now, div_asof(365 * 3)),
         )
     except Exception as e:
-        DBDataFetcher.log_error(f"TTR fail: {e}")
+        logger.error(f"TTR fail: {e}")
         return None, None
 
 
@@ -180,6 +203,7 @@ def is_payer(info: dict) -> bool:
 
 def fetch_symbol(symbol: str) -> dict | None:
     """Full fetch for one symbol. None if non-payer or fail."""
+    logger = DBLogger.get_logger("fetch_all", reset=False)
     symbol = symbol.strip().upper()
     if not symbol:
         return None
@@ -187,10 +211,10 @@ def fetch_symbol(symbol: str) -> dict | None:
         t = yf.Ticker(symbol)
         info = DBDataFetcher._retry_on_rate_limit(lambda: t.info or {})
     except Exception as e:
-        DBDataFetcher.log_error(f"{symbol} info fail: {e}")
+        logger.error(f"{symbol} info fail: {e}")
         return None
     if not is_payer(info):
-        DBDataFetcher.log_error(f"{symbol} skip: non-payer")
+        logger.error(f"{symbol} skip: non-payer")
         return None
     try:
         dividends = DBDataFetcher._retry_on_rate_limit(lambda: t.dividends)
@@ -295,12 +319,13 @@ def fetch_symbol(symbol: str) -> dict | None:
             "UPDATED_AT": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
-        DBDataFetcher.log_error(f"{symbol} fetch fail: {e}")
+        logger.error(f"{symbol} fetch fail: {e}")
         return None
 
 
 def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[dict]:
     """Two-pass: cheap info scan filters payers, then full fetch."""
+    logger = DBLogger.get_logger("fetch_all", reset=True)
     symbols = [s.strip().upper() for s in symbols if s and s.strip()]
     payers: list[str] = []
     for i in range(0, len(symbols), batch):
@@ -310,9 +335,9 @@ def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[d
                 if is_payer(info):
                     payers.append(sym)
                 else:
-                    DBDataFetcher.log_error(f"{sym} skip: non-payer")
+                    logger.error(f"{sym} skip: non-payer")
             except Exception as e:
-                DBDataFetcher.log_error(f"{sym} scan fail: {e}")
+                logger.error(f"{sym} scan fail: {e}")
         if sleep and i + batch < len(symbols):
             time.sleep(sleep)
     rows: list[dict] = []
@@ -326,19 +351,6 @@ def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[d
 
 
 class DBDataFetcher:
-    ERR_LOG_PATH = DB_DIR / "fetch_errors.log"
-
-    @staticmethod
-    def log_error(msg: str) -> None:
-        with open(DBDataFetcher.ERR_LOG_PATH, "a") as f:
-            f.write(f"{datetime.now(timezone.utc).isoformat()} {msg}\n")
-
-
-    @staticmethod
-    def print_progress(current: int, total: int):
-        print(f"Progress: {current}/{total} ({current / total:.2%})")
-
-
     @staticmethod
     def _retry_on_rate_limit(fn, attempts: int = 3):
         delay = 1.0
@@ -363,50 +375,60 @@ class DBDataFetcher:
         return symbols
 
 
-    def filter_consecutive_dividend_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
-        dividend_symbols = []
+    def filter_dividend_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
+        logger = DBLogger.get_logger("filter_divident", reset=True)
 
-        out = Path(output_path)
-        if out.exists():
-            out.unlink()
+        with log_streams_to(logger):
+            logger.info(f"Start proccessing {len(symbols)} symbols")
 
-        current_year = datetime.now().year
+            dividend_symbols = []
 
-        try:
-            for i in range(0, len(symbols), batch_size):
-                batch = symbols[i : i + batch_size]
-                try:
-                    tickers_obj = yf.Tickers(" ".join(batch))
-                    for sym in batch:
-                        try:
-                            ticker = tickers_obj.tickers[sym]
-                            divs = DBDataFetcher._retry_on_rate_limit(lambda: ticker.dividends)
-                            if not divs.empty:
-                                paying_years = sorted([
-                                    y for y in divs[divs > 0].index.year.unique() if y < current_year
-                                ])
-                                paying_years_set = set(paying_years)
-                                if all((current_year - j) in paying_years_set for j in range(1, last_n_years + 1)):
-                                    dividend_symbols.append(sym)
-                                    with open(out, "a") as f:
-                                        f.write(sym + "\n")
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            DBDataFetcher.log_error(f"{sym} inner consecutive filter fail: {e}")
+            out = Path(output_path)
+            if out.exists():
+                out.unlink()
 
-                    self.print_progress(min(i + batch_size, len(symbols)), len(symbols))
+            current_year = datetime.now().year
 
-                except KeyboardInterrupt:
-                    raise
-                except Exception as e:
-                    DBDataFetcher.log_error(f"Batch processing failed for {batch}: {e}")
-                    time.sleep(5 * sleep)
-                    continue
-                if sleep and (i + batch_size < len(symbols)):
-                    time.sleep(sleep)
+            try:
+                for i in range(0, len(symbols), batch_size):
+                    batch = symbols[i : i + batch_size]
+                    try:
+                        tickers_obj = yf.Tickers(" ".join(batch))
+                        for sym in batch:
 
-        except KeyboardInterrupt:
-            print("Got KeyboardInterrupt stopping...")
+                            try:
+                                ticker = tickers_obj.tickers[sym]
+                                divs = DBDataFetcher._retry_on_rate_limit(lambda: ticker.dividends)
+                                if not divs.empty:
+                                    paying_years = sorted([
+                                        y for y in divs[divs > 0].index.year.unique() if y < current_year
+                                    ])
+                                    paying_years_set = set(paying_years)
+                                    if all((current_year - j) in paying_years_set for j in range(1, last_n_years + 1)):
+                                        dividend_symbols.append(sym)
+                                        with open(out, "a") as f:
+                                            f.write(sym + "\n")
 
-        return dividend_symbols
+                            except KeyboardInterrupt:
+                                raise
+                            except Exception as e:
+                                logger.error(f"{sym} inner consecutive filter fail: {e}")
+
+                        DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols))
+
+                    except KeyboardInterrupt:
+                        raise
+                    except Exception as e:
+                        logger.error(f"Batch processing failed for {batch}: {e}")
+                        time.sleep(5 * sleep)
+
+                        continue
+                    if sleep and (i + batch_size < len(symbols)):
+                        time.sleep(sleep)
+
+            except KeyboardInterrupt:
+                print("Got KeyboardInterrupt stopping...")
+
+            logger.info(f"Done processing {len(dividend_symbols)} symbols")
+
+            return dividend_symbols

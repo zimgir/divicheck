@@ -26,7 +26,7 @@ def cmd_symbols(args) -> int:
         symbols = ALL_SYMBOLS_PATH.read_text().splitlines()
         print(f"loaded {len(symbols)} symbols from {ALL_SYMBOLS_PATH}")
 
-    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols, sleep=args.sleep, output_path=args.symbols)
+    dividend_symbols = fetcher.filter_dividend_symbols(symbols, sleep=args.sleep, output_path=args.symbols)
     print(f"saved {len(dividend_symbols)} dividend symbols to {args.symbols}")
     return 0
 
@@ -94,9 +94,9 @@ def main(argv=None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser_main.add_argument("--db", default=str(DB_PATH), help="Path to database file.")
-    parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/rebuild/update)).")
+    parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/rebuild/update).")
     parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by symbols/rebuild/update).")
-    parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/rebuild/update)).")
+    parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/rebuild/update).")
 
     parser_sub = parser_main.add_subparsers(dest="cmd", required=True)
 

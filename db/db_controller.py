@@ -44,18 +44,24 @@ class SQLDBController:
             con.execute(sql)
         con.commit()
 
+    def reset_db(self) -> None:
+        con = self.get_connection()
+        with con:
+            con.execute(self.DROP_TABLE_SQL)
+            self.init_db()
+
     def upsert_many(self, rows: List[Dict[str, any]]) -> int:
         if not rows:
             return 0
         con = self.get_connection()
-        
+
         # Use COLUMNS for conflict resolution
         cols = self.COLUMNS
         upsert_sql = (
             f"INSERT INTO stocks ({', '.join(cols)}) VALUES ({', '.join(['?'] * len(cols))}) "
             f"ON CONFLICT(SYMBOL) DO UPDATE SET {', '.join(f'{c}=excluded.{c}' for c in cols if c != 'SYMBOL')}"
         )
-        
+
         with con:
             con.executemany(upsert_sql, [[row.get(c) for c in cols] for row in rows])
         return len(rows)

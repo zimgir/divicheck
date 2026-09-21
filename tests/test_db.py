@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from db.sqldb_controller import SQLDBController
+from db.db_controller import SQLDBController
 
 FIXTURES = [
     {"SYMBOL": "AAA", "COMPANY": "A Co", "SECTOR": "Energy", "YIELD_1Y": 0.05, "DGR_5Y": 0.07,

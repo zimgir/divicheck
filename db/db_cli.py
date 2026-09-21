@@ -21,7 +21,7 @@ def cmd_symbols(args) -> int:
     fetcher = DBDataFetcher()
     if not ALL_SYMBOLS_PATH.exists() or args.all:
         symbols = fetcher.fetch_all_symbols(output_path=str(ALL_SYMBOLS_PATH))
-        print(f"generated/regenerated {len(symbols)} symbols to {ALL_SYMBOLS_PATH}")
+        print(f"downloaded {len(symbols)} symbols to {ALL_SYMBOLS_PATH}")
     else:
         symbols = ALL_SYMBOLS_PATH.read_text().splitlines()
         print(f"loaded {len(symbols)} symbols from {ALL_SYMBOLS_PATH}")
@@ -94,8 +94,9 @@ def main(argv=None) -> int:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser_main.add_argument("--db", default=str(DB_PATH), help="Path to database file.")
-    parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by rebuild/update).")
-    parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by rebuild/update).")
+    parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/rebuild/update)).")
+    parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by symbols/rebuild/update).")
+    parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/rebuild/update)).")
 
     parser_sub = parser_main.add_subparsers(dest="cmd", required=True)
 

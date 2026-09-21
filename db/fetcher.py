@@ -1,16 +1,12 @@
-"""yfinance fetch + derived metrics. Per-symbol try/except, missing -> None."""
-
 import time
+import pandas as pd
+import yfinance as yf
+import requests
+
 from datetime import datetime, timezone
 from pathlib import Path
 
-LOG_PATH = Path(__file__).resolve().parent / "fetch_errors.log"
-
-
-def log_error(msg: str) -> None:
-    with open(LOG_PATH, "a") as f:
-        f.write(f"{datetime.now(timezone.utc).isoformat()} {msg}\n")
-
+from db import DB_DIR
 
 # ---- pure calc fns (no network) ----
 
@@ -26,9 +22,6 @@ def cagr(start: float, end: float, years: int):
 def calc_dividend_growth(dividends, years: int):
     """CAGR of calendar-year dividend sums over `years` (complete years only)."""
     try:
-        import pandas as pd
-        from datetime import datetime
-
         if dividends is None or len(dividends) == 0:
             return None
         s = pd.Series(dividends)
@@ -92,20 +85,6 @@ def calc_total_return(start_price, end_price, dividends):
 
 # ---- yfinance helpers ----
 
-def _retry(fn, attempts: int = 3):
-    delay = 1.0
-    for i in range(attempts):
-        try:
-            return fn()
-        except Exception as e:
-            if i == attempts - 1:
-                raise
-            time.sleep(delay)
-            delay *= 2
-            last = e
-    raise last
-
-
 def _cell(df, names: list[str]):
     """First matching row label -> latest column value. None-safe."""
     try:
@@ -140,11 +119,7 @@ def _pct(x):
 
 
 def _norm_yield(raw, cur_div, price):
-    """Pick scale (raw vs raw/100) closest to CUR_DIV/PRICE cross-check.
-
-    yfinance 1.0 sends percent (KO 2.42, MSFT 0.74) so bare `_pct` misses
-    sub-1% yields (0.74 -> 74%). Computed yield disambiguates.
-    """
+    """Pick scale (raw vs raw/100) closest to CUR_DIV/PRICE cross-check."""
     try:
         if raw is None:
             return None
@@ -162,9 +137,7 @@ def _norm_yield(raw, cur_div, price):
 def _ttr(ticker, dividends) -> tuple:
     """(ttr_1y, ttr_3y) from single 3y history call."""
     try:
-        import pandas as pd
-
-        hist = _retry(lambda: ticker.history(period="3y", auto_adjust=False))
+        hist = DBDataFetcher._retry_on_rate_limit(lambda: ticker.history(period="3y", auto_adjust=False))
         if hist is None or len(hist) == 0:
             return None, None
         close = hist["Close"].dropna()
@@ -194,7 +167,7 @@ def _ttr(ticker, dividends) -> tuple:
             calc_total_return(p3, now, div_asof(365 * 3)),
         )
     except Exception as e:
-        log_error(f"TTR fail: {e}")
+        DBDataFetcher.log_error(f"TTR fail: {e}")
         return None, None
 
 
@@ -207,26 +180,21 @@ def is_payer(info: dict) -> bool:
 
 def fetch_symbol(symbol: str) -> dict | None:
     """Full fetch for one symbol. None if non-payer or fail."""
-    import yfinance as yf
-    import pandas as pd
-
     symbol = symbol.strip().upper()
     if not symbol:
         return None
     try:
         t = yf.Ticker(symbol)
-        info = _retry(lambda: t.info or {})
+        info = DBDataFetcher._retry_on_rate_limit(lambda: t.info or {})
     except Exception as e:
-        log_error(f"{symbol} info fail: {e}")
+        DBDataFetcher.log_error(f"{symbol} info fail: {e}")
         return None
     if not is_payer(info):
-        log_error(f"{symbol} skip: non-payer")
+        DBDataFetcher.log_error(f"{symbol} skip: non-payer")
         return None
     try:
-        dividends = _retry(lambda: t.dividends)
+        dividends = DBDataFetcher._retry_on_rate_limit(lambda: t.dividends)
         if dividends is None:
-            import pandas as pd
-
             dividends = pd.Series(dtype=float)
         now = pd.Timestamp.now(tz="UTC")
         cutoff = now.tz_convert(None) if now.tz is not None else now
@@ -257,15 +225,15 @@ def fetch_symbol(symbol: str) -> dict | None:
         chowder = calc_chowder(y1, dgr[5])
 
         try:
-            fin = _retry(lambda: t.income_stmt if getattr(t, "income_stmt", None) is not None and len(getattr(t, "income_stmt")) else t.financials)
+            fin = DBDataFetcher._retry_on_rate_limit(lambda: t.income_stmt if getattr(t, "income_stmt", None) is not None and len(getattr(t, "income_stmt")) else t.financials)
         except Exception:
             fin = None
         try:
-            bs = _retry(lambda: t.balance_sheet)
+            bs = DBDataFetcher._retry_on_rate_limit(lambda: t.balance_sheet)
         except Exception:
             bs = None
         try:
-            cf = _retry(lambda: t.cashflow)
+            cf = DBDataFetcher._retry_on_rate_limit(lambda: t.cashflow)
         except Exception:
             cf = None
 
@@ -327,26 +295,24 @@ def fetch_symbol(symbol: str) -> dict | None:
             "UPDATED_AT": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
-        log_error(f"{symbol} fetch fail: {e}")
+        DBDataFetcher.log_error(f"{symbol} fetch fail: {e}")
         return None
 
 
 def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[dict]:
     """Two-pass: cheap info scan filters payers, then full fetch."""
-    import yfinance as yf
-
     symbols = [s.strip().upper() for s in symbols if s and s.strip()]
     payers: list[str] = []
     for i in range(0, len(symbols), batch):
         for sym in symbols[i : i + batch]:
             try:
-                info = _retry(lambda s=sym: yf.Ticker(s).info or {})
+                info = DBDataFetcher._retry_on_rate_limit(lambda s=sym: yf.Ticker(s).info or {})
                 if is_payer(info):
                     payers.append(sym)
                 else:
-                    log_error(f"{sym} skip: non-payer")
+                    DBDataFetcher.log_error(f"{sym} skip: non-payer")
             except Exception as e:
-                log_error(f"{sym} scan fail: {e}")
+                DBDataFetcher.log_error(f"{sym} scan fail: {e}")
         if sleep and i + batch < len(symbols):
             time.sleep(sleep)
     rows: list[dict] = []
@@ -360,75 +326,87 @@ def fetch_all(symbols: list[str], sleep: float = 1.0, batch: int = 50) -> list[d
 
 
 class DBDataFetcher:
+    ERR_LOG_PATH = DB_DIR / "fetch_errors.log"
+
+    @staticmethod
+    def log_error(msg: str) -> None:
+        with open(DBDataFetcher.ERR_LOG_PATH, "a") as f:
+            f.write(f"{datetime.now(timezone.utc).isoformat()} {msg}\n")
+
+
+    @staticmethod
+    def print_progress(current: int, total: int):
+        print(f"Progress: {current}/{total} ({current / total:.2%})")
+
+
+    @staticmethod
+    def _retry_on_rate_limit(fn, attempts: int = 3):
+        delay = 1.0
+        for i in range(attempts):
+            try:
+                return fn()
+            except Exception as e:
+                if "429" in str(e):
+                    time.sleep(60)
+                    continue
+                if i == attempts - 1:
+                    raise
+                time.sleep(delay)
+                delay *= 2
+        raise Exception("Max retries exceeded")
+
+
     def fetch_all_symbols(self, output_path: str = "symbols_all.txt") -> list[str]:
-        import requests
-        from pathlib import Path
         r = requests.get("https://scanner.tradingview.com/america/scan", timeout=30)
-        # remove exchange prefix, then split by / to remove suffixes (e.g., RNR/PG -> RNR)
         symbols = [item["s"].split(":")[-1].split("/")[0] for item in r.json()["data"]]
         Path(output_path).write_text("\n".join(symbols))
         return symbols
 
 
-    def filter_consecutive_dividend_symbols(self, symbols: list[str], seq_years: int = 5, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
-        import time
-        import pandas as pd
-        import yfinance as yf
-        from pathlib import Path
-
+    def filter_consecutive_dividend_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
         dividend_symbols = []
+
         out = Path(output_path)
         if out.exists():
             out.unlink()
 
-        # 1. Clean symbols: Strip exchange prefix (e.g., "NYSE:HKD" -> "HKD")
-        clean_symbols = [s.split(":")[-1] for s in symbols]
-
-        # 2. Process in manageable batch sizes
-        batch_size = 40
         current_year = datetime.now().year
 
-        for i in range(0, len(clean_symbols), batch_size):
-            batch = clean_symbols[i : i + batch_size]
+        try:
+            for i in range(0, len(symbols), batch_size):
+                batch = symbols[i : i + batch_size]
+                try:
+                    tickers_obj = yf.Tickers(" ".join(batch))
+                    for sym in batch:
+                        try:
+                            ticker = tickers_obj.tickers[sym]
+                            divs = DBDataFetcher._retry_on_rate_limit(lambda: ticker.dividends)
+                            if not divs.empty:
+                                paying_years = sorted([
+                                    y for y in divs[divs > 0].index.year.unique() if y < current_year
+                                ])
+                                paying_years_set = set(paying_years)
+                                if all((current_year - j) in paying_years_set for j in range(1, last_n_years + 1)):
+                                    dividend_symbols.append(sym)
+                                    with open(out, "a") as f:
+                                        f.write(sym + "\n")
+                        except KeyboardInterrupt:
+                            raise
+                        except Exception as e:
+                            DBDataFetcher.log_error(f"{sym} inner consecutive filter fail: {e}")
 
-            try:
-                # Initialize bulk ticker instances
-                tickers_obj = yf.Tickers(" ".join(batch))
+                    self.print_progress(min(i + batch_size, len(symbols)), len(symbols))
 
-                for sym in batch:
-                    try:
-                        ticker = tickers_obj.tickers[sym]
-                        divs = ticker.dividends
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    DBDataFetcher.log_error(f"Batch processing failed for {batch}: {e}")
+                    time.sleep(5 * sleep)
+                    continue
+                if sleep and (i + batch_size < len(symbols)):
+                    time.sleep(sleep)
 
-                        if not divs.empty:
-                            # Extract sorted list of unique completed historical years with actual payouts
-                            paying_years = sorted([
-                                y for y in divs[divs > 0].index.year.unique() if y < current_year
-                            ])
-
-                            # 3. Calculate if paid in each of the last seq_years
-                            paying_years_set = set(paying_years)
-                            paid_all_seq_years = all(
-                                (current_year - i) in paying_years_set for i in range(1, seq_years + 1)
-                            )
-
-                            if paid_all_seq_years:
-                                dividend_symbols.append(sym)
-                                with open(out, "a") as f:
-                                    f.write(sym + "\n")
-
-                    except Exception as e:
-                        log_error(f"{sym} inner consecutive filter fail: {e}")
-
-                print(f"Progress: processed {min(i + batch_size, len(clean_symbols))} / {len(clean_symbols)} symbols")
-
-            except Exception as e:
-                log_error(f"Batch processing failed for {batch}: {e}")
-                time.sleep(5.0)  # Extended backoff recovery
-                continue
-
-            # 4. Rate limit throttle between sequential historical data requests
-            if sleep and (i + batch_size < len(clean_symbols)):
-                time.sleep(sleep)
+        except KeyboardInterrupt:
+            print("Got KeyboardInterrupt stopping...")
 
         return dividend_symbols

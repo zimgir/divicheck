@@ -5,8 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
+from db import DB_DIR, ALL_SYMBOLS_PATH, DIVIDEND_SYMBOLS_PATH
 from db.sqldb_controller import SQLDBController
 
 DB_PATH = Path(__file__).resolve().parent / "divicheck.db"
@@ -91,19 +90,20 @@ def cmd_stats(args) -> int:
 
 def cmd_symbols(args) -> int:
     from db.fetcher import DBDataFetcher
-    from pathlib import Path
 
-    db_dir = Path(__file__).resolve().parent.parent / ".db"
-    db_dir.mkdir(exist_ok=True)
-    all_path = db_dir / "symbols_all.txt"
-    div_path = db_dir / "symbols_dividend.txt"
+    if not DB_DIR.exists():
+        DB_DIR.mkdir()
 
     fetcher = DBDataFetcher()
-    symbols = fetcher.fetch_all_symbols(output_path=str(all_path))
-    print(f"saved {len(symbols)} symbols to {all_path}")
+    if not ALL_SYMBOLS_PATH.exists() or args.all:
+        symbols = fetcher.fetch_all_symbols(output_path=str(ALL_SYMBOLS_PATH))
+        print(f"generated/regenerated {len(symbols)} symbols to {ALL_SYMBOLS_PATH}")
+    else:
+        symbols = ALL_SYMBOLS_PATH.read_text().splitlines()
+        print(f"loaded {len(symbols)} symbols from {ALL_SYMBOLS_PATH}")
 
-    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols, output_path=str(div_path))
-    print(f"saved {len(dividend_symbols)} dividend symbols to {div_path}")
+    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols, output_path=str(DIVIDEND_SYMBOLS_PATH))
+    print(f"saved {len(dividend_symbols)} dividend symbols to {DIVIDEND_SYMBOLS_PATH}")
     return 0
 
 
@@ -118,7 +118,7 @@ def main(argv=None) -> int:
         p.add_argument("--sleep", type=float, default=1.0)
         if name == "update":
             p.add_argument("--prune", action="store_true")
-    sub.add_parser("symbols")
+    sub.add_parser("symbols").add_argument("--all", action="store_true")
     ps = sub.add_parser("stats")
     ps.add_argument("--db", default=str(DB_PATH))
     args = ap.parse_args(argv)

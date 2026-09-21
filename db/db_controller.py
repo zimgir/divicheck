@@ -84,12 +84,3 @@ class SQLDBController:
         with con:
             cur = con.execute(sql, symbols)
         return cur.rowcount
-
-    def fetch_all_rows(self) -> List[sqlite3.Row]:
-        con = self.get_connection()
-        return con.execute("SELECT * FROM stocks").fetchall()
-
-    def close(self) -> None:
-        if self._conn:
-            self._conn.close()
-            self._conn = None

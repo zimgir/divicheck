@@ -1,34 +1,12 @@
-import sys
 import time
 import pandas as pd
 import yfinance as yf
 import requests
-import logging
-import contextlib
 
 from datetime import datetime, timezone
 from pathlib import Path
 
 from db.logger import DBLogger, log_streams_to
-
-class LoggerStream:
-    def __init__(self, logger, original_stream, is_error=False):
-        self.logger = logger
-        self.orig = original_stream
-        self.is_error = is_error
-
-    def write(self, msg):
-        self.orig.write(msg)
-        for line in msg.splitlines():
-            clean = line.strip()
-            if clean:
-                if self.is_error:
-                    self.logger.error(clean)
-                else:
-                    self.logger.info(clean)
-
-    def flush(self):
-        self.orig.flush()
 
 # ---- pure calc fns (no network) ----
 
@@ -324,8 +302,8 @@ def fetch_symbol(symbol: str) -> dict | None:
 
 
 
-
 class DBDataFetcher:
+
     @staticmethod
     def _retry_on_rate_limit(fn, attempts: int = 3):
         delay = 1.0

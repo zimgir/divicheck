@@ -45,9 +45,9 @@ def load_symbols(args):
 
 
 def cmd_update(args) -> int:
-    fetcher = DBDataFetcher()
-
     symbols = load_symbols(args)
+
+    fetcher = DBDataFetcher()
     fetcher.fetch_db_rows(symbols, FETCH_ROWS_PATH, sleep=args.sleep)
 
     db = SQLDBController(args.db)

@@ -406,28 +406,21 @@ class DBDataFetcher:
                                 y for y in divs[divs > 0].index.year.unique() if y < current_year
                             ])
 
-                            # 3. Calculate the maximum consecutive streak
-                            max_streak = 0
-                            current_streak = 0
-                            prev_year = None
+                            # 3. Calculate if paid in each of the last seq_years
+                            paying_years_set = set(paying_years)
+                            paid_all_seq_years = all(
+                                (current_year - i) in paying_years_set for i in range(1, seq_years + 1)
+                            )
 
-                            for year in paying_years:
-                                if prev_year is None or year == prev_year + 1:
-                                    current_streak += 1
-                                else:
-                                    current_streak = 1  # Reset streak if there's a gap year
-
-                                max_streak = max(max_streak, current_streak)
-                                prev_year = year
-
-                            # Add symbol if the longest streak is at least 5 years
-                            if max_streak >= seq_years:
+                            if paid_all_seq_years:
                                 dividend_symbols.append(sym)
                                 with open(out, "a") as f:
                                     f.write(sym + "\n")
 
                     except Exception as e:
                         log_error(f"{sym} inner consecutive filter fail: {e}")
+
+                print(f"Progress: processed {min(i + batch_size, len(clean_symbols))} / {len(clean_symbols)} symbols")
 
             except Exception as e:
                 log_error(f"Batch processing failed for {batch}: {e}")

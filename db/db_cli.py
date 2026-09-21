@@ -91,13 +91,19 @@ def cmd_stats(args) -> int:
 
 def cmd_symbols(args) -> int:
     from db.fetcher import DBDataFetcher
+    from pathlib import Path
+
+    db_dir = Path(__file__).resolve().parent.parent / ".db"
+    db_dir.mkdir(exist_ok=True)
+    all_path = db_dir / "symbols_all.txt"
+    div_path = db_dir / "symbols_dividend.txt"
 
     fetcher = DBDataFetcher()
-    symbols = fetcher.fetch_all_symbols()
-    print(f"saved {len(symbols)} symbols to symbols_all.txt")
+    symbols = fetcher.fetch_all_symbols(output_path=str(all_path))
+    print(f"saved {len(symbols)} symbols to {all_path}")
 
-    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols)
-    print(f"saved {len(dividend_symbols)} dividend symbols to symbols_dividend.txt")
+    dividend_symbols = fetcher.filter_consecutive_dividend_symbols(symbols, output_path=str(div_path))
+    print(f"saved {len(dividend_symbols)} dividend symbols to {div_path}")
     return 0
 
 

@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 
 from db.schema import SCHEMA
 
@@ -38,7 +38,7 @@ class DBRowCalculator:
 
         try:
             ex_ts = info.get("exDividendDate")
-            ex_date = datetime.fromtimestamp(int(ex_ts), tz=datetime.timezone.utc).date().isoformat() if ex_ts else pay_date
+            ex_date = datetime.fromtimestamp(int(ex_ts), tz=timezone.utc).date().isoformat() if ex_ts else pay_date
         except Exception:
             ex_date = pay_date
 
@@ -76,43 +76,42 @@ class DBRowCalculator:
 
         result = {
             SCHEMA["SYMBOL"].name: self.symbol,
-            SCHEMA["STOCK_TYPE"].name: info.get("quoteType"),
-            SCHEMA["COMPANY"].name: info.get("shortName") or info.get("longName"),
             SCHEMA["SECTOR"].name: info.get("sector"),
-            SCHEMA["INDUSTRY"].name: info.get("industry"),
             SCHEMA["PRICE"].name: price,
             SCHEMA["FAIR_VALUE"].name: info.get("targetMeanPrice"),
             SCHEMA["YIELD_1Y"].name: y1,
             SCHEMA["YIELD_5Y"].name: self._norm_yield_5y(info.get("fiveYearAvgDividendYield"), cur_div, price),
-            SCHEMA["DIV_1Y"].name: div_1y,
-            SCHEMA["CUR_DIV"].name: cur_div,
-            SCHEMA["NUM_DIV_1Y"].name: num_div,
-            SCHEMA["PAY_DATE"].name: pay_date,
-            SCHEMA["CHOWDER"].name: chowder,
-            SCHEMA["ROE"].name: info.get("returnOnEquity"),
-            SCHEMA["PAYOUT_RATIO"].name: info.get("payoutRatio"),
-            SCHEMA["DEBT_CAPITAL"].name: info.get("debtToEquity"),
+            SCHEMA["TTR_1Y"].name: ttr_1y,
+            SCHEMA["TTR_3Y"].name: ttr_3y,
             SCHEMA["DGR_1Y"].name: dgr[1],
             SCHEMA["DGR_3Y"].name: dgr[3],
             SCHEMA["DGR_5Y"].name: dgr[5],
             SCHEMA["DGR_10Y"].name: dgr[10],
-            SCHEMA["TTR_1Y"].name: ttr_1y,
-            SCHEMA["TTR_3Y"].name: ttr_3y,
-            SCHEMA["EPS_1Y"].name: eps_growth,
-            SCHEMA["REVENUE_1Y"].name: info.get("revenueGrowth"),
+            SCHEMA["CHOWDER"].name: chowder,
+            SCHEMA["ROE"].name: info.get("returnOnEquity"),
             SCHEMA["NPM"].name: self._div(ni, rev),
             SCHEMA["ROTC"].name: self._div(ebit, float(debt or 0) + float(equity or 0)),
             SCHEMA["CUR_R"].name: self._div(ca, cl),
+            SCHEMA["EPS_1Y"].name: eps_growth,
+            SCHEMA["CF_SHARE"].name: self._div(ocf, shares),
+            SCHEMA["PAYOUT_RATIO"].name: info.get("payoutRatio"),
+            SCHEMA["DEBT_CAPITAL"].name: info.get("debtToEquity"),
+            SCHEMA["REVENUE_1Y"].name: info.get("revenueGrowth"),
+            SCHEMA["PEG"].name: self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None,
             SCHEMA["P_E"].name: pe,
             SCHEMA["P_BV"].name: self._div(price, bv) if bv else info.get("priceToBook"),
-            SCHEMA["CF_SHARE"].name: self._div(ocf, shares),
-            SCHEMA["PEG"].name: self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None,
             SCHEMA["FAIR_PRICE"].name: info.get("targetMeanPrice"),
             SCHEMA["PRICE_LOW"].name: info.get("fiftyTwoWeekLow"),
             SCHEMA["PRICE_HIGH"].name: info.get("fiftyTwoWeekHigh"),
+            SCHEMA["CUR_DIV"].name: cur_div,
             SCHEMA["PREV_DIV"].name: prev_div,
+            SCHEMA["NUM_DIV_1Y"].name: num_div,
+            SCHEMA["DIV_1Y"].name: div_1y,
+            SCHEMA["PAY_DATE"].name: pay_date,
             SCHEMA["EX_DATE"].name: ex_date,
-            SCHEMA["UPDATED_AT"].name: datetime.now(datetime.timezone.utc).isoformat(),
+            SCHEMA["COMPANY"].name: info.get("shortName") or info.get("longName"),
+            SCHEMA["INDUSTRY"].name: info.get("industry"),
+            SCHEMA["UPDATED_AT"].name: datetime.now(timezone.utc).isoformat(),
         }
 
         return result

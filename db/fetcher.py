@@ -27,7 +27,7 @@ class DBDataFetcher:
         logger = DBLogger.get_logger("filter_divident", reset=True)
 
         with log_streams_to(logger):
-            logger.info(f"Start proccessing {len(symbols)} symbols")
+            print(f"Start proccessing {len(symbols)} symbols")
 
             dividend_symbols = []
 
@@ -70,7 +70,7 @@ class DBDataFetcher:
                         time.sleep(sleep)
             except KeyboardInterrupt:
                 print("Got KeyboardInterrupt stopping...")
-            logger.info(f"Done processing {len(dividend_symbols)} symbols")
+            print(f"Done processing {len(dividend_symbols)} symbols")
             return dividend_symbols
 
 
@@ -82,7 +82,7 @@ class DBDataFetcher:
                 if k not in SCHEMA: continue
                 col_def = SCHEMA[k]
                 if col_def.data_type == "REAL" and isinstance(v, (int, float)):
-                    val = round(float(v), 2)
+                    val = round(float(v), 4)
                     if col_def.unit == "%":
                         new_row[k] = val * 100
                     else:
@@ -96,7 +96,7 @@ class DBDataFetcher:
         """Fetch/calculate in batches, write directly to intermediate CSV."""
         logger = DBLogger.get_logger("fetch_db_rows", reset=True)
         with log_streams_to(logger):
-            logger.info(f"Start fetching {len(symbols)} symbols. Output: {output_csv}")
+            print(f"Start fetching rows for {len(symbols)} symbols. Output: {output_csv}")
             first = True
             if output_csv.exists():
                 output_csv.unlink()
@@ -120,7 +120,7 @@ class DBDataFetcher:
                 if sleep and (i + batch_size < len(symbols)):
                     time.sleep(sleep)
 
-            logger.info(f"Done fetching. Saved to {output_csv}")
+            print(f"Done fetching {len(processed_rows)}. Saved to {output_csv}")
             return output_csv
 
 

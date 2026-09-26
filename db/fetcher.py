@@ -8,6 +8,7 @@ from pathlib import Path
 
 from db.logger import DBLogger, log_streams_to
 from db.calculator import DBRowCalculator
+from db.schema import SCHEMA
 
 class DBDataFetcher:
 
@@ -73,6 +74,24 @@ class DBDataFetcher:
             return dividend_symbols
 
 
+    def _process_rows(self, rows: list[dict]) -> list[dict]:
+        processed_rows = []
+        for row in rows:
+            new_row = row.copy()
+            for k, v in row.items():
+                if k not in SCHEMA: continue
+                col_def = SCHEMA[k]
+                if col_def.data_type == "REAL" and isinstance(v, (int, float)):
+                    val = round(float(v), 2)
+                    if col_def.unit == "%":
+                        new_row[k] = val * 100
+                    else:
+                        new_row[k] = val
+                else:
+                    new_row[k] = v
+            processed_rows.append(new_row)
+        return processed_rows
+
     def fetch_db_rows(self, symbols: list[str], output_csv: Path, batch_size: int = 40, sleep: float = 1.0) -> Path:
         """Fetch/calculate in batches, write directly to intermediate CSV."""
         logger = DBLogger.get_logger("fetch_db_rows", reset=True)
@@ -92,7 +111,8 @@ class DBDataFetcher:
                         calc = DBRowCalculator(sym, raw_data)
                         rows.append(calc.calculate())
                 if rows:
-                    df = pd.DataFrame(rows)
+                    processed_rows = self._process_rows(rows)
+                    df = pd.DataFrame(processed_rows)
                     df.to_csv(output_csv, mode='a', index=False, header=first)
                     first = False
 

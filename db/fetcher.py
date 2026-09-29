@@ -212,13 +212,17 @@ class DBDataFetcher:
 
             p1, p3 = price_asof(365), price_asof(365 * 3)
 
-            def calc_total_return(start_price, end_price, dividends):
-                try: return (float(end_price) - float(start_price) + float(dividends or 0)) / start_price
+            def calc_total_return(start_price, end_price, dividends, years: int = 1):
+                try:
+                    cum = (float(end_price) - float(start_price) + float(dividends or 0)) / start_price
+                    if years <= 1:
+                        return cum
+                    return (1.0 + cum) ** (1.0 / years) - 1.0
                 except: return None
 
             return (
-                calc_total_return(p1, now, div_asof(365)),
-                calc_total_return(p3, now, div_asof(365 * 3)),
+                calc_total_return(p1, now, div_asof(365), 1),
+                calc_total_return(p3, now, div_asof(365 * 3), 3),
             )
         except Exception as e:
             logger.error(f"TTR fail: {e}")

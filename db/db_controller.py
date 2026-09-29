@@ -64,15 +64,23 @@ class SQLDBController:
             return 0
         con = self.get_connection()
 
-        # Use COLUMNS for conflict resolution
         cols = self.COLUMNS
+        date_cols = {"PAY_DATE", "EX_DATE", "UPDATED_AT"}
+        processed_rows = []
+        for row in rows:
+            new_row = row.copy()
+            for dc in date_cols:
+                if dc in new_row and new_row[dc] is not None:
+                    new_row[dc] = schema.format_date(new_row[dc])
+            processed_rows.append(new_row)
+
         upsert_sql = (
             f"INSERT INTO stocks ({', '.join(cols)}) VALUES ({', '.join(['?'] * len(cols))}) "
             f"ON CONFLICT(SYMBOL) DO UPDATE SET {', '.join(f'{c}=excluded.{c}' for c in cols if c != 'SYMBOL')}"
         )
 
         with con:
-            con.executemany(upsert_sql, [[row.get(c) for c in cols] for row in rows])
+            con.executemany(upsert_sql, [[row.get(c) for c in cols] for row in processed_rows])
         return len(rows)
 
     def delete_missing(self, symbols: List[str]) -> int:

@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import datetime, timezone
 
-from db.schema import SCHEMA
+from db.schema import SCHEMA, format_date
 
 class DBRowCalculator:
     def __init__(self, symbol: str, data: dict):
@@ -31,14 +31,14 @@ class DBRowCalculator:
             num_div = 0
 
         try:
-            pay_date = pd.to_datetime(dividends.index[-1]).date().isoformat() if dividends is not None and len(dividends) else None
+            pay_date = format_date(dividends.index[-1]) if dividends is not None and len(dividends) else None
             prev_div = float(dividends.iloc[-2]) if dividends is not None and len(dividends) > 1 else None
         except Exception:
             pay_date, prev_div = None, None
 
         try:
             ex_ts = info.get("exDividendDate")
-            ex_date = datetime.fromtimestamp(int(ex_ts), tz=timezone.utc).date().isoformat() if ex_ts else pay_date
+            ex_date = format_date(datetime.fromtimestamp(int(ex_ts), tz=timezone.utc)) if ex_ts else pay_date
         except Exception:
             ex_date = pay_date
 
@@ -74,11 +74,12 @@ class DBRowCalculator:
         shares = info.get("sharesOutstanding") or info.get("impliedSharesOutstanding")
         eps_growth = info.get("earningsGrowth") or info.get("earningsQuarterlyGrowth")
 
+        fair_price = self._calc_fair_price(info, fin)
         result = {
             SCHEMA["SYMBOL"].name: self.symbol,
             SCHEMA["SECTOR"].name: info.get("sector"),
             SCHEMA["PRICE"].name: price,
-            SCHEMA["FAIR_VALUE"].name: info.get("targetMeanPrice"),
+            SCHEMA["FAIR_VALUE"].name: self._div(price, fair_price),
             SCHEMA["YIELD_1Y"].name: y1,
             SCHEMA["YIELD_5Y"].name: self._norm_yield_5y(info.get("fiveYearAvgDividendYield"), cur_div, price),
             SCHEMA["TTR_1Y"].name: ttr_1y,
@@ -111,7 +112,7 @@ class DBRowCalculator:
             SCHEMA["EX_DATE"].name: ex_date,
             SCHEMA["COMPANY"].name: info.get("shortName") or info.get("longName"),
             SCHEMA["INDUSTRY"].name: info.get("industry"),
-            SCHEMA["UPDATED_AT"].name: datetime.now(timezone.utc).isoformat(),
+            SCHEMA["UPDATED_AT"].name: format_date(datetime.now(timezone.utc)),
         }
 
         return result

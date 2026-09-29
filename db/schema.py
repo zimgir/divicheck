@@ -1,4 +1,35 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone, date
+from typing import Optional
+import pandas as pd
+
+def format_date(val) -> Optional[str]:
+    if val is None:
+        return None
+    try:
+        if isinstance(val, (int, float)):
+            dt = datetime.fromtimestamp(int(val), tz=timezone.utc)
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(val, str):
+            val = val.strip()
+            if not val:
+                return None
+            dt = pd.to_datetime(val)
+            if pd.isna(dt):
+                return None
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(val, (datetime, pd.Timestamp)):
+            if pd.isna(val):
+                return None
+            return val.strftime("%Y-%m-%d %H:%M:%S")
+        if isinstance(val, date):
+            return datetime(val.year, val.month, val.day).strftime("%Y-%m-%d %H:%M:%S")
+        dt = pd.to_datetime(val)
+        if pd.isna(dt):
+            return None
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return None
 
 @dataclass
 class DBColumn:

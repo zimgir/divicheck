@@ -11,9 +11,9 @@ from db.db_controller import SQLDBController
 
 FIXTURES = [
     {"SYMBOL": "AAA", "COMPANY": "A Co", "SECTOR": "Energy", "YIELD_1Y": 0.05, "DGR_5Y": 0.07,
-     "CHOWDER": 0.12, "CUR_DIV": 2.0, "P_E": 12.0, "P_BV": 1.5, "UPDATED_AT": "2026-01-01T00:00:00+00:00"},
+     "CHOWDER": 0.12, "CUR_DIV": 2.0, "P_E": 12.0, "P_BV": 1.5, "PAY_DATE": "2025-12-15", "EX_DATE": "2025-12-01 10:00:00", "UPDATED_AT": "2026-01-01T00:00:00+00:00"},
     {"SYMBOL": "BBB", "COMPANY": "B Co", "SECTOR": "Energy", "YIELD_1Y": 0.03, "DGR_5Y": 0.04,
-     "CHOWDER": 0.07, "CUR_DIV": 1.0, "P_E": 20.0, "P_BV": 2.5, "UPDATED_AT": "2026-01-01T00:00:00+00:00"},
+     "CHOWDER": 0.07, "CUR_DIV": 1.0, "P_E": 20.0, "P_BV": 2.5, "PAY_DATE": None, "EX_DATE": None, "UPDATED_AT": "2026-01-01 12:34:56"},
 ]
 
 
@@ -43,6 +43,12 @@ def verify(db: SQLDBController) -> list[str]:
             v = r[c]
             if v is not None and not v > 0:
                 errs.append(f"{r['SYMBOL']}: {c}<=0 ({v})")
+        import re
+        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
+        for dc in ("PAY_DATE", "EX_DATE", "UPDATED_AT"):
+            val = r[dc]
+            if val is not None and not date_pattern.match(val):
+                errs.append(f"{r['SYMBOL']}: {dc} not YYYY-MM-DD HH:MM:SS format ({val})")
         if all(r[c] is not None for c in ("CHOWDER", "YIELD_1Y", "DGR_5Y")):
             if abs(r["CHOWDER"] - (r["YIELD_1Y"] + r["DGR_5Y"])) > 1e-6:
                 errs.append(f"{r['SYMBOL']}: CHOWDER != YIELD+DGR_5Y")
@@ -75,12 +81,12 @@ def selftest() -> int:
         print("FAIL:", *errs, sep="\n  ")
         return 1
     # pure calc checks
-    from db.fetcher import cagr, calc_chowder, calc_peg
-
-    assert abs(cagr(1, 2, 1) - 1.0) < 1e-9
-    assert cagr(0, 1, 1) is None
-    assert abs(calc_chowder(0.05, 0.07) - 0.12) < 1e-9
-    assert calc_peg(20, -0.1) is None
+    from db.calculator import DBRowCalculator
+    calc = DBRowCalculator("TEST", {})
+    assert abs(calc._cagr(1, 2, 1) - 1.0) < 1e-9
+    assert calc._cagr(0, 1, 1) is None
+    assert abs((0.05 + 0.07) - 0.12) < 1e-9
+    assert calc._div(20, 0) is None
     print("selftest OK")
     return 0
 

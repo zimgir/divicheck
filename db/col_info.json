@@ -2,7 +2,7 @@
     "SYMBOL": "Stock Symbol",
     "SECTOR": "Company sector",
     "PRICE": "Current share price",
-    "FAIR_VALUE": "Percent over/under valued relative to fair value using Peter Lynch method",
+    "FAIR_VALUE": "over/under valued relative to fair price using Peter Lynch method",
     "YIELD_1Y": "Share divident yield % per year",
     "YIELD_5Y": "Share yield % per year on 5 years average",
     "TTR_1Y": "Total return over 1 year",

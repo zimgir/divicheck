@@ -44,7 +44,7 @@ SCHEMA = {
     "SYMBOL": DBColumn("SYMBOL", "TEXT", is_pk=True),
     "SECTOR": DBColumn("SECTOR", "TEXT", indexed=True),
     "PRICE": DBColumn("PRICE", "REAL", unit="$"),
-    "FAIR_VALUE": DBColumn("FAIR_VALUE", "REAL", unit="%"),
+    "FAIR_VALUE": DBColumn("FAIR_VALUE", "REAL"),
     "YIELD_1Y": DBColumn("YIELD_1Y", "REAL", indexed=True, unit="%"),
     "YIELD_5Y": DBColumn("YIELD_5Y", "REAL", unit="%"),
     "TTR_1Y": DBColumn("TTR_1Y", "REAL", unit="%"),

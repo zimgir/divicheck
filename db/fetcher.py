@@ -85,8 +85,10 @@ class DBDataFetcher:
                     if v is None:
                         new_row[k] = None
                     else:
-                        val = round(float(v), 4)
-                        new_row[k] = val * 100 if col_def.unit == "%" else val
+                        val = float(v)
+                        if col_def.unit == "%":
+                            val = val * 100
+                        new_row[k] = round(val, 4)
                 else:
                     new_row[k] = v
             processed_rows.append(new_row)

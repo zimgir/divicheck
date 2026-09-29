@@ -81,12 +81,12 @@ class DBDataFetcher:
             for k, v in row.items():
                 if k not in SCHEMA: continue
                 col_def = SCHEMA[k]
-                if col_def.data_type == "REAL" and isinstance(v, (int, float)):
-                    val = round(float(v), 4)
-                    if col_def.unit == "%":
-                        new_row[k] = val * 100
+                if col_def.data_type == "REAL":
+                    if v is None:
+                        new_row[k] = None
                     else:
-                        new_row[k] = val
+                        val = round(float(v), 4)
+                        new_row[k] = val * 100 if col_def.unit == "%" else val
                 else:
                     new_row[k] = v
             processed_rows.append(new_row)

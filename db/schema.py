@@ -53,7 +53,7 @@ SCHEMA = {
     "DGR_3Y": DBColumn("DGR_3Y", "REAL", unit="%"),
     "DGR_5Y": DBColumn("DGR_5Y", "REAL", indexed=True, unit="%"),
     "DGR_10Y": DBColumn("DGR_10Y", "REAL", unit="%"),
-    "CHOWDER": DBColumn("CHOWDER", "REAL"),
+    "CHOWDER": DBColumn("CHOWDER", "REAL", unit="%"),
     "ROE": DBColumn("ROE", "REAL", unit="%"),
     "NPM": DBColumn("NPM", "REAL", unit="%"),
     "ROTC": DBColumn("ROTC", "REAL", unit="%"),

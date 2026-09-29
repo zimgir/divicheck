@@ -100,7 +100,7 @@ class DBRowCalculator:
             SCHEMA["PEG"].name: self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None,
             SCHEMA["P_E"].name: pe,
             SCHEMA["P_BV"].name: self._div(price, bv) if bv else info.get("priceToBook"),
-            SCHEMA["FAIR_PRICE"].name: info.get("targetMeanPrice"),
+            SCHEMA["FAIR_PRICE"].name: self._calc_fair_price(info, fin),
             SCHEMA["PRICE_LOW"].name: info.get("fiftyTwoWeekLow"),
             SCHEMA["PRICE_HIGH"].name: info.get("fiftyTwoWeekHigh"),
             SCHEMA["CUR_DIV"].name: cur_div,
@@ -170,6 +170,34 @@ class DBRowCalculator:
         except Exception:
             return None
 
+
+    def _calc_fair_price(self, info, fin):
+        # Peter Lynch Fair Value = EPS (TTM) * 5-Year CAGR Growth Rate (capped 5-25%) * 1.0
+        eps = info.get("trailingEps")
+        if eps is None or fin is None or len(fin) == 0:
+            return None
+        try:
+            labels = {l.lower(): i for i, l in enumerate(fin.index)}
+            ni_key = None
+            for n in ("net income", "net income common stockholders"):
+                if n in labels:
+                    ni_key = labels[n]
+                    break
+            if ni_key is None:
+                return None
+            row = fin.iloc[ni_key].dropna().sort_index()
+            if len(row) < 2:
+                return None
+            num_years = min(5, len(row) - 1)
+            initial_val = float(row.iloc[-num_years - 1])
+            final_val = float(row.iloc[-1])
+            if initial_val <= 0 or final_val <= 0:
+                return None
+            cagr = (final_val / initial_val) ** (1 / num_years) - 1
+            growth_rate = max(5.0, min(25.0, cagr * 100))
+            return float(eps) * growth_rate
+        except Exception:
+            return None
 
     def _norm_yield_5y(self, raw, cur_div, price):
         # reuse or adapt existing logic

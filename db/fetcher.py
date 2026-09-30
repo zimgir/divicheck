@@ -23,7 +23,25 @@ class DBDataFetcher:
         return symbols
 
 
-    def filter_dividend_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
+    def _filter_divident_symbols(self, divs: pd.Series, last_n_years: int = 5) -> bool:
+        if divs is None or divs.empty:
+            return False
+        current_year = datetime.now().year
+        series = pd.Series(divs)
+        series.index = pd.to_datetime(series.index)
+        yearly_dividends = series.groupby(series.index.year).sum().sort_index()
+        target_years = [current_year - j for j in range(last_n_years, 0, -1)]
+        if not all(y in yearly_dividends.index for y in target_years):
+            return False
+        vals = [yearly_dividends[y] for y in target_years]
+        if not all(v > 0 for v in vals):
+            return False
+        if not all(vals[k] > vals[k-1] for k in range(1, len(vals))):
+            return False
+        return True
+
+
+    def fetch_divident_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
         logger = DBLogger.get_logger("filter_divident", reset=True)
 
         with log_streams_to(logger):
@@ -34,7 +52,6 @@ class DBDataFetcher:
             out = Path(output_path)
             if out.exists():
                 out.unlink()
-            current_year = datetime.now().year
             try:
                 for i in range(0, len(symbols), batch_size):
                     batch = symbols[i : i + batch_size]
@@ -45,15 +62,10 @@ class DBDataFetcher:
                             try:
                                 ticker = tickers_obj.tickers[sym]
                                 divs = self._retry_on_rate_limit(lambda: ticker.dividends)
-                                if not divs.empty:
-                                    paying_years = sorted([
-                                        y for y in divs[divs > 0].index.year.unique() if y < current_year
-                                    ])
-                                    paying_years_set = set(paying_years)
-                                    if all((current_year - j) in paying_years_set for j in range(1, last_n_years + 1)):
-                                        dividend_symbols.append(sym)
-                                        with open(out, "a") as f:
-                                            f.write(sym + "\n")
+                                if self._filter_divident_symbols(divs, last_n_years=last_n_years):
+                                    dividend_symbols.append(sym)
+                                    with open(out, "a") as f:
+                                        f.write(sym + "\n")
 
                             except KeyboardInterrupt:
                                 raise

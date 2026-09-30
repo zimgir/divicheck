@@ -23,7 +23,7 @@ def cmd_symbols(args) -> int:
         symbols = ALL_SYMBOLS_PATH.read_text().splitlines()
         print(f"loaded {len(symbols)} symbols from {ALL_SYMBOLS_PATH}")
 
-    dividend_symbols = fetcher.filter_dividend_symbols(symbols, sleep=args.sleep, output_path=args.symbols)
+    dividend_symbols = fetcher.fetch_divident_symbols(symbols, sleep=args.sleep, output_path=args.symbols)
 
     print(f"saved {len(dividend_symbols)} dividend symbols to {args.symbols}")
 

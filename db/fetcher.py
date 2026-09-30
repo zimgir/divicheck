@@ -148,7 +148,10 @@ class DBDataFetcher:
             try: cf = self._retry_on_rate_limit(lambda: t.cashflow)
             except Exception: cf = None
 
-            ttr_1y, ttr_3y = self._ttr(t, dividends)
+            try:
+                hist = self._retry_on_rate_limit(lambda: t.history(period="3y", auto_adjust=False))
+            except Exception:
+                hist = None
 
             return {
                 "info": info,
@@ -156,8 +159,7 @@ class DBDataFetcher:
                 "income_stmt": fin,
                 "balance_sheet": bs,
                 "cashflow": cf,
-                "ttr_1y": ttr_1y,
-                "ttr_3y": ttr_3y
+                "history": hist
             }
         except Exception as e:
             logger.error(f"{symbol} fetch raw data fail: {e}")
@@ -182,51 +184,7 @@ class DBDataFetcher:
         raise Exception("Max rate limit retries exceeded")
 
 
-    def _ttr(self, ticker, dividends) -> tuple:
-        """(ttr_1y, ttr_3y) from single 3y history call."""
-        logger = DBLogger.get_logger("fetch_all", reset=False)
-        try:
-            hist = self._retry_on_rate_limit(lambda: ticker.history(period="3y", auto_adjust=False))
-            if hist is None or len(hist) == 0:
-                return None, None
-            close = hist["Close"].dropna()
-            if len(close) < 2:
-                return None, None
-            now = close.iloc[-1]
-            idx = close.index.tz_convert(None) if close.index.tz is not None else close.index
 
-            def price_asof(days: int):
-                cutoff = idx[-1] - pd.Timedelta(days=days)
-                past = close[idx <= cutoff]
-                return float(past.iloc[-1]) if len(past) else float(close.iloc[0])
-
-            def div_asof(days: int):
-                try:
-                    if dividends is None or len(dividends) == 0:
-                        return 0.0
-                    s = pd.Series(dividends)
-                    s.index = pd.to_datetime(s.index).tz_convert(None) if s.index.tz is not None else pd.to_datetime(s.index)
-                    return float(s[s.index >= (idx[-1] - pd.Timedelta(days=days))].sum())
-                except Exception:
-                    return 0.0
-
-            p1, p3 = price_asof(365), price_asof(365 * 3)
-
-            def calc_total_return(start_price, end_price, dividends, years: int = 1):
-                try:
-                    cum = (float(end_price) - float(start_price) + float(dividends or 0)) / start_price
-                    if years <= 1:
-                        return cum
-                    return (1.0 + cum) ** (1.0 / years) - 1.0
-                except: return None
-
-            return (
-                calc_total_return(p1, now, div_asof(365), 1),
-                calc_total_return(p3, now, div_asof(365 * 3), 3),
-            )
-        except Exception as e:
-            logger.error(f"TTR fail: {e}")
-            return None, None
 
 
     def _is_payer(self, info: dict) -> bool:

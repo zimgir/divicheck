@@ -14,8 +14,8 @@ class DBRowCalculator:
         self.income_statement = self.financial_data.get("income_stmt")
         self.balance_sheet = self.financial_data.get("balance_sheet")
         self.cash_flow = self.financial_data.get("cashflow")
-        self.ttr_1y = self.financial_data.get("ttr_1y")
-        self.ttr_3y = self.financial_data.get("ttr_3y")
+        self.history = self.financial_data.get("history")
+        self.ttr_1y, self.ttr_3y = self._calculate_ttr()
 
         self.current_price = self.company_info.get("currentPrice") or self.company_info.get("regularMarketPrice")
 
@@ -365,3 +365,48 @@ class DBRowCalculator:
             )
         except Exception:
             return None
+
+
+    def _calculate_ttr(self) -> tuple[float | None, float | None]:
+        """Calculates 1-year and 3-year total return (ttr_1y, ttr_3y) from history and dividends."""
+        try:
+            hist = self.history
+            if hist is None or len(hist) == 0:
+                return None, None
+            close = hist["Close"].dropna()
+            if len(close) < 2:
+                return None, None
+            now = close.iloc[-1]
+            idx = close.index.tz_convert(None) if close.index.tz is not None else close.index
+
+            def price_asof(days: int):
+                cutoff = idx[-1] - pd.Timedelta(days=days)
+                past = close[idx <= cutoff]
+                return float(past.iloc[-1]) if len(past) else float(close.iloc[0])
+
+            def div_asof(days: int):
+                try:
+                    if self.dividend_series is None or len(self.dividend_series) == 0:
+                        return 0.0
+                    s = pd.Series(self.dividend_series)
+                    s.index = pd.to_datetime(s.index).tz_convert(None) if s.index.tz is not None else pd.to_datetime(s.index)
+                    return float(s[s.index >= (idx[-1] - pd.Timedelta(days=days))].sum())
+                except Exception:
+                    return 0.0
+
+            p1, p3 = price_asof(365), price_asof(365 * 3)
+
+            def calc_total_return(start_price, end_price, dividends, years: int = 1):
+                try:
+                    cum = (float(end_price) - float(start_price) + float(dividends or 0)) / start_price
+                    if years <= 1:
+                        return cum
+                    return (1.0 + cum) ** (1.0 / years) - 1.0
+                except: return None
+
+            return (
+                calc_total_return(p1, now, div_asof(365), 1),
+                calc_total_return(p3, now, div_asof(365 * 3), 3),
+            )
+        except Exception:
+            return None, None

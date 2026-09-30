@@ -72,7 +72,7 @@ class DBRowCalculator:
 
     def calculate(self) -> dict:
         """Constructs and returns the complete dictionary of calculated database columns for the stock symbol."""
-        return {
+        row = {
             SCHEMA["SYMBOL"].name: self._calc_symbol(),
             SCHEMA["SECTOR"].name: self._calc_sector(),
             SCHEMA["PRICE"].name: self._calc_price(),
@@ -111,6 +111,25 @@ class DBRowCalculator:
             SCHEMA["INDUSTRY"].name: self._calc_industry(),
             SCHEMA["UPDATED_AT"].name: self._calc_updated_at(),
         }
+        return self._process_row(row)
+
+
+    def _process_row(self, row: dict) -> dict:
+        new_row = row.copy()
+        for k, v in row.items():
+            if k not in SCHEMA: continue
+            col_def = SCHEMA[k]
+            if col_def.data_type == "REAL":
+                if v is None:
+                    new_row[k] = None
+                else:
+                    val = float(v)
+                    if col_def.unit == "%":
+                        val = val * 100
+                    new_row[k] = round(val, 4)
+            else:
+                new_row[k] = v
+        return new_row
 
 
     # Per-column calculation methods

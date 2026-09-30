@@ -74,26 +74,6 @@ class DBDataFetcher:
             return dividend_symbols
 
 
-    def _process_rows(self, rows: list[dict]) -> list[dict]:
-        processed_rows = []
-        for row in rows:
-            new_row = row.copy()
-            for k, v in row.items():
-                if k not in SCHEMA: continue
-                col_def = SCHEMA[k]
-                if col_def.data_type == "REAL":
-                    if v is None:
-                        new_row[k] = None
-                    else:
-                        val = float(v)
-                        if col_def.unit == "%":
-                            val = val * 100
-                        new_row[k] = round(val, 4)
-                else:
-                    new_row[k] = v
-            processed_rows.append(new_row)
-        return processed_rows
-
     def fetch_db_rows(self, symbols: list[str], output_csv: Path, batch_size: int = 40, sleep: float = 1.0) -> Path:
         """Fetch/calculate in batches, write directly to intermediate CSV."""
         logger = DBLogger.get_logger("fetch_db_rows", reset=True)
@@ -103,6 +83,7 @@ class DBDataFetcher:
             if output_csv.exists():
                 output_csv.unlink()
 
+            total_fetched = 0
             for i in range(0, len(symbols), batch_size):
                 batch = symbols[i : i + batch_size]
 
@@ -113,16 +94,16 @@ class DBDataFetcher:
                         calc = DBRowCalculator(sym, raw_data)
                         rows.append(calc.calculate())
                 if rows:
-                    processed_rows = self._process_rows(rows)
-                    df = pd.DataFrame(processed_rows)
+                    df = pd.DataFrame(rows)
                     df.to_csv(output_csv, mode='a', index=False, header=first)
                     first = False
+                    total_fetched += len(rows)
 
                 DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols))
                 if sleep and (i + batch_size < len(symbols)):
                     time.sleep(sleep)
 
-            print(f"Done fetching {len(processed_rows)}. Saved to {output_csv}")
+            print(f"Done fetching {total_fetched}. Saved to {output_csv}")
             return output_csv
 
 
@@ -182,9 +163,6 @@ class DBDataFetcher:
                 time.sleep(delay)
                 delay *= 2
         raise Exception("Max rate limit retries exceeded")
-
-
-
 
 
     def _is_payer(self, info: dict) -> bool:

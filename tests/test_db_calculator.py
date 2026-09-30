@@ -2,7 +2,6 @@ import pytest
 import pandas as pd
 from pathlib import Path
 from db.calculator import DBRowCalculator
-from db.fetcher import DBDataFetcher
 import json
 import functools
 
@@ -143,9 +142,7 @@ def test_peg_fallback():
 
 def test_jnj_reference_row(jnj_data):
     calc = DBRowCalculator("JNJ", jnj_data)
-    res = calc.calculate()
-    fetcher = DBDataFetcher()
-    processed = fetcher._process_rows([res])[0]
+    processed = calc.calculate()
 
     expected = {
         "SYMBOL": "JNJ", "SECTOR": "Healthcare", "PRICE": 264.89, "FAIR_VALUE": 2.1473,

@@ -20,15 +20,20 @@ class DBRowCalculator:
 
         now = pd.Timestamp.now(tz="UTC")
         try:
-            s = pd.Series(dividends)
-            s.index = pd.to_datetime(s.index)
-            naive_idx = s.index.tz_convert(None) if s.index.tz is not None else s.index
-            last12 = s[naive_idx >= (pd.Timestamp.now() - pd.Timedelta(days=365))]
-            div_1y = float(last12.sum()) if len(last12) else None
-            num_div = int(len(last12)) if len(last12) else 0
+            s = pd.Series(dividends) if dividends is not None else pd.Series(dtype=float)
+            if not s.empty:
+                s.index = pd.to_datetime(s.index)
+                naive_idx = s.index.tz_convert(None) if s.index.tz is not None else s.index
+                last12 = s[naive_idx >= (pd.Timestamp.now() - pd.Timedelta(days=365))]
+                num_div = int(len(last12)) if len(last12) else 0
+                cur_div = float(s.iloc[-1]) if len(s) else None
+            else:
+                num_div = 0
+                cur_div = float(info.get("dividendRate") or 0) or None
         except Exception:
-            div_1y = None
-            num_div = 0
+            cur_div, num_div = None, 0
+
+        div_1y = float(cur_div * num_div) if cur_div is not None and num_div > 0 else None
 
         try:
             pay_date = format_date(dividends.index[-1]) if dividends is not None and len(dividends) else None
@@ -44,7 +49,7 @@ class DBRowCalculator:
 
         dgr = {n: self._calc_dividend_growth(dividends, n) for n in (1, 3, 5, 10)}
         price = info.get("currentPrice") or info.get("regularMarketPrice")
-        cur_div = float(info.get("trailingAnnualDividendRate") or div_1y or 0) or None
+        cur_div = cur_div or float(info.get("trailingAnnualDividendRate") or 0) or None
 
         # Norm yield logic
         raw_y = info.get("dividendYield")

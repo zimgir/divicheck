@@ -62,10 +62,12 @@ class DBRowCalculator:
         rev = self._cell(fin, ["Total Revenue"])
         ni = self._cell(fin, ["Net Income"])
         ebit = self._cell(fin, ["EBIT"])
+        op_inc = self._cell(fin, ["Operating Income", "EBIT"])
         debt = self._cell(bs, ["Total Debt"])
         equity = self._cell(bs, ["Total Stockholder Equity", "Total Equity"])
         ca = self._cell(bs, ["Total Current Assets", "Current Assets"])
         cl = self._cell(bs, ["Total Current Liabilities", "Current Liabilities"])
+        assets = self._cell(bs, ["Total Assets", "Assets"])
         ocf = self._cell(cf, ["Total Cash From Operating Activities", "Operating Cash Flow"])
 
         eps = info.get("trailingEps")
@@ -90,8 +92,8 @@ class DBRowCalculator:
             SCHEMA["DGR_10Y"].name: dgr[10],
             SCHEMA["CHOWDER"].name: chowder,
             SCHEMA["ROE"].name: info.get("returnOnEquity"),
-            SCHEMA["NPM"].name: self._div(ni, rev),
-            SCHEMA["ROTC"].name: self._div(ebit, float(debt or 0) + float(equity or 0)),
+            SCHEMA["NPM"].name: info.get("profitMargins") or self._div(ni, rev),
+            SCHEMA["ROTC"].name: self._div(op_inc, (float(assets or 0) - float(cl or 0)) if assets and cl else None) or self._div(ebit, float(debt or 0) + float(equity or 0)),
             SCHEMA["CUR_R"].name: self._div(ca, cl),
             SCHEMA["EPS_1Y"].name: eps_growth,
             SCHEMA["CF_SHARE"].name: self._div(ocf, shares),

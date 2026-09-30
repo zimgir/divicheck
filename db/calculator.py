@@ -98,7 +98,15 @@ class DBRowCalculator:
             SCHEMA["EPS_1Y"].name: eps_growth,
             SCHEMA["CF_SHARE"].name: self._div(ocf, shares),
             SCHEMA["PAYOUT_RATIO"].name: info.get("payoutRatio"),
-            SCHEMA["DEBT_CAPITAL"].name: info.get("debtToEquity"),
+            SCHEMA["DEBT_CAPITAL"].name: (
+                (float(debt) / (float(debt) + float(equity))) * 100
+                if debt is not None and equity is not None and (float(debt) + float(equity)) > 0
+                else (
+                    (float(info.get("debtToEquity")) / (100.0 + float(info.get("debtToEquity")))) * 100
+                    if info.get("debtToEquity") is not None
+                    else None
+                )
+            ),
             SCHEMA["REVENUE_1Y"].name: info.get("revenueGrowth"),
             SCHEMA["PEG"].name: self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None,
             SCHEMA["P_E"].name: pe,

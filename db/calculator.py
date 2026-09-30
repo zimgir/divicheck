@@ -108,7 +108,7 @@ class DBRowCalculator:
                 )
             ),
             SCHEMA["REVENUE_1Y"].name: info.get("revenueGrowth"),
-            SCHEMA["PEG"].name: self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None,
+            SCHEMA["PEG"].name: info.get("pegRatio") or (self._div(pe, float(eps_growth or 0) * 100) if pe and eps_growth and eps_growth > 0 else None),
             SCHEMA["P_E"].name: pe,
             SCHEMA["P_BV"].name: self._div(price, bv) if bv else info.get("priceToBook"),
             SCHEMA["FAIR_PRICE"].name: self._calc_fair_price(info, fin),

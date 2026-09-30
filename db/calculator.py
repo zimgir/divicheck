@@ -22,17 +22,19 @@ class DBRowCalculator:
         # Parse dividend attributes
         try:
             dividend_dataframe = pd.Series(self.dividend_series) if self.dividend_series is not None else pd.Series(dtype=float)
+            self.dividends_last_twelve_months = None
             if not dividend_dataframe.empty:
                 dividend_dataframe.index = pd.to_datetime(dividend_dataframe.index)
                 naive_index = dividend_dataframe.index.tz_convert(None) if dividend_dataframe.index.tz is not None else dividend_dataframe.index
-                dividends_last_twelve_months = dividend_dataframe[naive_index >= (pd.Timestamp.now() - pd.Timedelta(days=365))]
-                self.dividend_count_last_year = int(len(dividends_last_twelve_months)) if len(dividends_last_twelve_months) else 0
+                self.dividends_last_twelve_months = dividend_dataframe[naive_index >= (pd.Timestamp.now() - pd.Timedelta(days=365))]
+                self.dividend_count_last_year = int(len(self.dividends_last_twelve_months)) if len(self.dividends_last_twelve_months) else 0
                 self.current_dividend = float(dividend_dataframe.iloc[-1]) if len(dividend_dataframe) else None
             else:
                 self.dividend_count_last_year = 0
                 self.current_dividend = float(self.company_info.get("dividendRate") or 0) or None
         except Exception:
             self.current_dividend, self.dividend_count_last_year = None, 0
+            self.dividends_last_twelve_months = None
 
         self.current_dividend = self.current_dividend or float(self.company_info.get("trailingAnnualDividendRate") or 0) or None
 
@@ -257,6 +259,11 @@ class DBRowCalculator:
         return self.dividend_count_last_year
 
     def _calc_div_1y(self) -> float | None:
+        if self.dividends_last_twelve_months is not None and not self.dividends_last_twelve_months.empty:
+            return float(self.dividends_last_twelve_months.sum())
+        trailing_rate = self.company_info.get("trailingAnnualDividendRate")
+        if trailing_rate is not None:
+            return float(trailing_rate)
         if self.current_dividend is not None and self.dividend_count_last_year > 0:
             return float(self.current_dividend * self.dividend_count_last_year)
         return None

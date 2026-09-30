@@ -152,7 +152,7 @@ def test_jnj_reference_row(jnj_data):
         "CUR_R": 1.0277, "EPS_1Y": -0.9, "CF_SHARE": 10.1789, "PAYOUT_RATIO": 0.6079,
         "DEBT_CAPITAL": 37.0205, "REVENUE_1Y": 6.6, "PEG": 2.81, "P_E": 30.716,
         "P_BV": 7.5082, "FAIR_PRICE": 123.428, "PRICE_LOW": 182.94, "PRICE_HIGH": 281.07,
-        "CUR_DIV": 1.34, "PREV_DIV": 1.34, "NUM_DIV_1Y": 4, "DIV_1Y": 5.36,
+        "CUR_DIV": 1.34, "PREV_DIV": 1.34, "NUM_DIV_1Y": 4, "DIV_1Y": 5.28,
         "COMPANY": "Johnson & Johnson", "INDUSTRY": "Drug Manufacturers - General"
     }
 
@@ -165,3 +165,13 @@ def test_jnj_reference_row(jnj_data):
 
     assert isinstance(processed["PAY_DATE"], str)
     assert isinstance(processed["EX_DATE"], str)
+
+
+def test_variable_div_1y():
+    now = pd.Timestamp.now()
+    dates = [now - pd.Timedelta(days=30), now - pd.Timedelta(days=120), now - pd.Timedelta(days=210), now - pd.Timedelta(days=300)]
+    divs = pd.Series([1.5, 1.2, 1.2, 1.0], index=dates)
+    calc = DBRowCalculator("TEST", {"dividends": divs})
+    res = calc.calculate()
+    assert res["DIV_1Y"] == 4.9
+

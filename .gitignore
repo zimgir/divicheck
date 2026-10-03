@@ -4,6 +4,7 @@
 __pycache__/
 
 .db/
+.app/
 .logs/
 
 *.csv

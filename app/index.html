@@ -131,16 +131,16 @@
       background: #4f4f4f;
     }
     .analysis-top-panel {
-      position: sticky;
-      top: 75px;
-      z-index: 90;
       display: flex;
       gap: 20px;
       flex-wrap: wrap;
       background: #1e1e1e;
       padding-top: 0;
       padding-bottom: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 0;
+      box-sizing: border-box;
+      will-change: transform;
+      transform: translateZ(0);
     }
     .analysis-top-panel .stats-card {
       flex: 1;
@@ -154,12 +154,22 @@
   <div class="sticky-header">
     <h1>Divicheck Dashboard</h1>
     <div class="tab-panel">
-      <button class="tab-btn active" onclick="switchView('search')">search</button>
-      <button class="tab-btn" onclick="switchView('analysis')">analysis</button>
+      <button class="tab-btn active" onclick="switchView('analysis')">analysis</button>
+      <button class="tab-btn" onclick="switchView('search')">search</button>
+    </div>
+    <div id="sticky-analysis-panel" class="analysis-top-panel">
+      <div class="stats-card" id="analysis-summary">
+        <span class="loading">Loading analysis...</span>
+      </div>
+      <div class="stats-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <div style="width: 100%; height: 180px; position: relative;">
+          <canvas id="sectorPieChart"></canvas>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div id="view-search" class="view-content active">
+  <div id="view-search" class="view-content">
     <div class="stats-card" id="stats-summary">
       <span class="loading">Loading stats...</span>
     </div>
@@ -176,18 +186,7 @@
     </div>
   </div>
 
-  <div id="view-analysis" class="view-content">
-    <div class="analysis-top-panel">
-      <div class="stats-card" id="analysis-summary">
-        <span class="loading">Loading analysis...</span>
-      </div>
-      <div class="stats-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
-        <div style="width: 100%; height: 180px; position: relative;">
-          <canvas id="sectorPieChart"></canvas>
-        </div>
-      </div>
-    </div>
-
+  <div id="view-analysis" class="view-content active">
     <div class="table-container">
       <table>
         <thead>
@@ -213,13 +212,18 @@
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
 
-      if (viewName === 'search') {
+      const analysisPanel = document.getElementById('sticky-analysis-panel');
+
+      if (viewName === 'analysis') {
         document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
-        document.getElementById('view-search').classList.add('active');
-      } else if (viewName === 'analysis') {
-        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
         document.getElementById('view-analysis').classList.add('active');
+        analysisPanel.style.display = 'flex';
         loadAnalysis();
+      } else if (viewName === 'search') {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('view-search').classList.add('active');
+        analysisPanel.style.display = 'none';
+        loadData();
       }
     }
 
@@ -287,7 +291,7 @@
                   color: '#cccccc',
                   boxWidth: 12,
                   font: {
-                    size: 11
+                    size: 13
                   }
                 }
               },
@@ -354,7 +358,12 @@
       }
     }
 
-    loadData();
+    window.onload = async () => {
+      while (!window.api || !window.api.getPortfolioStats) {
+        await new Promise(r => setTimeout(r, 50));
+      }
+      loadAnalysis();
+    };
   </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-from db import ALL_SYMBOLS_PATH, DIVIDEND_SYMBOLS_PATH, DB_PATH, FETCH_ROWS_PATH, FALLBACK_SYMBOLS
+from db import ALL_SYMBOLS_PATH, DIVIDEND_SYMBOLS_PATH, DEFAULT_SYMBOLS_PATH, DB_PATH, FETCH_ROWS_PATH, FALLBACK_SYMBOLS
 from db.fetcher import DBDataFetcher
 from db.db_controller import SQLDBController
 
@@ -31,17 +31,25 @@ def cmd_symbols(args) -> int:
 
 
 def load_symbols(args):
+    default_symbols = []
+    if DEFAULT_SYMBOLS_PATH.exists():
+        default_symbols = DEFAULT_SYMBOLS_PATH.read_text().splitlines()
+
+    dividend_symbols = []
     if args.symbols.exists():
-        return args.symbols.read_text().splitlines()
+        dividend_symbols = args.symbols.read_text().splitlines()
+    else:
+        try:
+            cmd_symbols(args)
+            if args.symbols.exists():
+                dividend_symbols = args.symbols.read_text().splitlines()
+        except Exception as e:
+            print(f"Error generating symbols: {e}")
 
-    try:
-        cmd_symbols(args)
-        if args.symbols.exists():
-            return args.symbols.read_text().splitlines()
-    except Exception as e:
-        print(f"Error generating symbols: {e}")
+    if not dividend_symbols and not default_symbols:
+        dividend_symbols = list(FALLBACK_SYMBOLS)
 
-    return list(FALLBACK_SYMBOLS)
+    return list(dict.fromkeys(default_symbols + dividend_symbols))
 
 
 def cmd_update(args) -> int:

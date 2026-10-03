@@ -10,6 +10,7 @@ DB_PATH = DB_DIR / "divicheck.db"
 
 ALL_SYMBOLS_PATH = DB_DIR / "symbols_all.txt"
 DIVIDEND_SYMBOLS_PATH = DB_DIR / "symbols_dividend.txt"
+DEFAULT_SYMBOLS_PATH = DB_DIR / "symbols_default.txt"
 FETCH_ROWS_PATH = DB_DIR / "fetch_rows.csv"
 
 FALLBACK_SYMBOLS = ("AAPL", "MSFT", "JNJ", "PG", "KO", "PEP", "XOM", "CVX", "T", "VZ")

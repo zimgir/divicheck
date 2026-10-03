@@ -143,6 +143,7 @@ ipcMain.handle('get-portfolio-stats', async () => {
     detailedHoldings.push({
       symbol,
       company: stock.COMPANY || symbol,
+      sector: stock.SECTOR || 'Unknown',
       shares,
       price: price ? price.toFixed(2) : 'N/A',
       holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
@@ -150,6 +151,15 @@ ipcMain.handle('get-portfolio-stats', async () => {
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00'
     });
   }
+
+  let sectorMap = {};
+  for (const h of detailedHoldings) {
+    const sec = h.sector;
+    const val = Number(h.holding_value) || 0;
+    sectorMap[sec] = (sectorMap[sec] || 0) + val;
+  }
+  const sectorLabels = Object.keys(sectorMap);
+  const sectorValues = Object.values(sectorMap).map(v => Number(v.toFixed(2)));
 
   const averageDividendYield = totalHoldingsValue > 0 ? (totalYearlyDividend / totalHoldingsValue) * 100 : 0;
   const expectedMonthlyDividend = totalYearlyDividend / 12;
@@ -159,6 +169,10 @@ ipcMain.handle('get-portfolio-stats', async () => {
     average_dividend_yield: averageDividendYield.toFixed(2),
     expected_total_yearly_dividend: totalYearlyDividend.toFixed(2),
     expected_monthly_dividend: expectedMonthlyDividend.toFixed(2),
-    holdings: detailedHoldings
+    holdings: detailedHoldings,
+    sectors: {
+      labels: sectorLabels,
+      values: sectorValues
+    }
   };
 });

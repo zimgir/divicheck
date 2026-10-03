@@ -130,7 +130,25 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #4f4f4f;
     }
+    .analysis-top-panel {
+      position: sticky;
+      top: 75px;
+      z-index: 90;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      background: #1e1e1e;
+      padding-top: 0;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .analysis-top-panel .stats-card {
+      flex: 1;
+      min-width: 320px;
+      margin-bottom: 0;
+    }
   </style>
+  <script src="./node_modules/chart.js/dist/chart.umd.js"></script>
 </head>
 <body>
   <div class="sticky-header">
@@ -159,8 +177,15 @@
   </div>
 
   <div id="view-analysis" class="view-content">
-    <div class="stats-card" id="analysis-summary">
-      <span class="loading">Loading analysis...</span>
+    <div class="analysis-top-panel">
+      <div class="stats-card" id="analysis-summary">
+        <span class="loading">Loading analysis...</span>
+      </div>
+      <div class="stats-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <div style="width: 100%; height: 180px; position: relative;">
+          <canvas id="sectorPieChart"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="table-container">
@@ -229,6 +254,57 @@
             <td>${h.yield_1y}%</td>
           </tr>
         `).join('');
+
+        const ctx = document.getElementById('sectorPieChart').getContext('2d');
+        if (window.sectorChartInstance) {
+          window.sectorChartInstance.destroy();
+        }
+
+        const sectorColors = [
+          '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
+          '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#84cc16',
+          '#f97316', '#6366f1'
+        ];
+
+        window.sectorChartInstance = new Chart(ctx, {
+          type: 'pie',
+          data: {
+            labels: stats.sectors.labels,
+            datasets: [{
+              data: stats.sectors.values,
+              backgroundColor: sectorColors.slice(0, stats.sectors.labels.length),
+              borderWidth: 1,
+              borderColor: '#252526'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'right',
+                labels: {
+                  color: '#cccccc',
+                  boxWidth: 12,
+                  font: {
+                    size: 11
+                  }
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || '';
+                    const value = context.parsed || 0;
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const pct = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                    return ` ${label}: $${value.toFixed(2)} (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
       } catch (err) {
         document.getElementById('analysis-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
         document.getElementById('analysis-table-body').innerHTML = `<tr><td colspan="7" style="color: red;">Failed to load portfolio analysis</td></tr>`;

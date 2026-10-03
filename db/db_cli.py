@@ -77,24 +77,54 @@ def cmd_update(args) -> int:
 
 
 def cmd_stats(args) -> int:
+    db_path = Path(args.db)
+    file_size = db_path.stat().st_size if db_path.exists() else 0
+
+    total_rows = 0
+    matching_rows_data = []
+    source = "FALLBACK_SYMBOLS"
+    symbols = list(FALLBACK_SYMBOLS)
+
+    if DEFAULT_SYMBOLS_PATH.exists():
+        symbols = DEFAULT_SYMBOLS_PATH.read_text().splitlines()
+        source = "DEFAULT_SYMBOLS"
+
     db = SQLDBController(args.db)
     con = db.get_connection()
     try:
-        total = con.execute("SELECT COUNT(*) c FROM stocks").fetchone()["c"]
-    except sqlite3.OperationalError:
-        print("empty DB (no stocks table). run rebuild first.")
-        return 1
-    print(f"rows: {total}")
-    for r in con.execute("SELECT SECTOR, COUNT(*) c FROM stocks GROUP BY SECTOR ORDER BY c DESC"):
-        print(f"  {r['SECTOR'] or '?'}: {r['c']}")
-    r = con.execute("SELECT AVG(YIELD_1Y) a FROM stocks WHERE YIELD_1Y IS NOT NULL").fetchone()
-    print(f"avg yield: {r['a']}")
-    print("-- top yield --")
-    for x in con.execute("SELECT SYMBOL, YIELD_1Y FROM stocks WHERE YIELD_1Y IS NOT NULL ORDER BY YIELD_1Y DESC LIMIT 10"):
-        print(f"  {x['SYMBOL']}: {x['YIELD_1Y']}")
-    print("-- top chowder --")
-    for x in con.execute("SELECT SYMBOL, CHOWDER FROM stocks WHERE CHOWDER IS NOT NULL ORDER BY CHOWDER DESC LIMIT 10"):
-        print(f"  {x['SYMBOL']}: {x['CHOWDER']}")
+        cur = con.execute("SELECT count(*) FROM stocks")
+        total_rows = cur.fetchone()[0]
+
+        if symbols:
+            placeholders = ",".join(["?"] * len(symbols))
+            cur = con.execute(f"SELECT SYMBOL, COMPANY, PRICE, YIELD_1Y, CHOWDER, UPDATED_AT FROM stocks WHERE SYMBOL IN ({placeholders})", symbols)
+            matching_rows_data = cur.fetchall()
+    except Exception:
+        pass
+
+    print(f"\n")
+
+    print(f"Database: {db_path}")
+    print(f"File size: {file_size} bytes")
+    print(f"Total rows: {total_rows}")
+    print(f"Matching rows ({source}): {len(matching_rows_data)}")
+
+    if matching_rows_data:
+        print("\nMatching symbols:\n")
+        header = f"  {'SYMBOL':<6} | {'COMPANY':<30} | {'PRICE':<8} | {'YIELD 1Y':<9} | {'CHOWDER':<9} | {'UPDATED AT'}"
+        print(header)
+        print("  " + "-" * (len(header) - 2))
+        for r in matching_rows_data:
+            symbol = str(r['SYMBOL'] or '')
+            company = str(r['COMPANY'] or '')[:30]
+            price = f"{r['PRICE']:.2f}" if r['PRICE'] is not None else ""
+            yield_1y = f"{r['YIELD_1Y']:.2f}%" if r['YIELD_1Y'] is not None else ""
+            chowder = f"{r['CHOWDER']:.2f}%" if r['CHOWDER'] is not None else ""
+            updated_at = str(r['UPDATED_AT'] or '')
+            print(f"  {symbol:<6} | {company:<30} | {price:<8} | {yield_1y:<9} | {chowder:<9} | {updated_at}")
+
+    print(f"\n")
+
     return 0
 
 

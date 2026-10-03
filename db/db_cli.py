@@ -102,6 +102,28 @@ def cmd_stats(args) -> int:
     except Exception:
         pass
 
+    if getattr(args, 'json', False):
+        import json
+        out = {
+            "db_path": str(db_path),
+            "file_size": file_size,
+            "total_rows": total_rows,
+            "source": source,
+            "symbols": symbols,
+            "rows": [
+                {
+                    "SYMBOL": r['SYMBOL'],
+                    "COMPANY": r['COMPANY'],
+                    "PRICE": r['PRICE'],
+                    "YIELD_1Y": r['YIELD_1Y'],
+                    "CHOWDER": r['CHOWDER'],
+                    "UPDATED_AT": r['UPDATED_AT']
+                } for r in matching_rows_data
+            ]
+        }
+        print(json.dumps(out))
+        return 0
+
     print(f"\n")
 
     print(f"Database: {db_path}")
@@ -149,6 +171,7 @@ def main(argv=None) -> int:
     parser_update.add_argument("--reset", action="store_true", help="Rebuild database from scratch.")
 
     parser_stats = parser_sub.add_parser("stats", help="Show database statistics.")
+    parser_stats.add_argument("--json", action="store_true", help="Output stats as JSON.")
 
     args = parser_main.parse_args(argv)
 

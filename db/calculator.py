@@ -350,11 +350,12 @@ class DBRowCalculator:
                 yearly_dividends = yearly_dividends.iloc[:-1]
             if len(yearly_dividends) < years + 1:
                 return None
-            return self._calculate_compound_annual_growth_rate(
+            cagr = self._calculate_compound_annual_growth_rate(
                 float(yearly_dividends.iloc[-years - 1]),
                 float(yearly_dividends.iloc[-1]),
                 years
             )
+            return min(0.50, cagr) if cagr is not None else None
         except Exception:
             return None
 

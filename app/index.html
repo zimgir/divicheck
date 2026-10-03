@@ -118,11 +118,18 @@
         }
 
         const columns = Object.keys(stats.rows[0]);
-        theadTr.innerHTML = columns.map(col => `<th>${col}</th>`).join('');
+        const colInfo = stats.col_info || {};
+        theadTr.innerHTML = columns.map(col => {
+          const desc = colInfo[col] || col;
+          return `<th title="${desc}">${col}</th>`;
+        }).join('');
 
         tbody.innerHTML = stats.rows.map(r => `
           <tr>
-            ${columns.map(col => `<td>${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`).join('')}
+            ${columns.map(col => {
+              const desc = colInfo[col] || '';
+              return `<td title="${desc}">${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`;
+            }).join('')}
           </tr>
         `).join('');
       } catch (err) {

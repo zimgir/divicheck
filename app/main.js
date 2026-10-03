@@ -73,12 +73,21 @@ ipcMain.handle('get-stats', async () => {
     }
   }
 
+  let col_info = {};
+  const colInfoPath = path.join(rootDir, 'db', 'col_info.json');
+  if (fs.existsSync(colInfoPath)) {
+    try {
+      col_info = JSON.parse(fs.readFileSync(colInfoPath, 'utf8'));
+    } catch (e) {}
+  }
+
   return {
     db_path: dbPath,
     file_size,
     total_rows,
     source,
     symbols,
-    rows
+    rows,
+    col_info
   };
 });

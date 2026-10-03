@@ -1,0 +1,16 @@
+{
+  "name": "divicheck-gui",
+  "version": "1.0.0",
+  "description": "Divicheck Electron GUI",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.0"
+  },
+  "devDependencies": {
+    "electron": "^31.3.0",
+    "electron-rebuild": "^3.2.9"
+  }
+}

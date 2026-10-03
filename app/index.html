@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Divicheck GUI</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f7;
+      color: #333;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+    .stats-card {
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .table-container {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+      overflow-x: auto;
+      width: 100%;
+    }
+    table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    th, td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      border-right: 1px solid #f0f0f0;
+    }
+    th {
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      font-weight: 600;
+      border-bottom: 2px solid #ddd;
+    }
+    tr:hover {
+      background: #f9f9f9;
+    }
+    .loading {
+      color: #666;
+      font-style: italic;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Divicheck Dashboard</h1>
+  <div class="stats-card" id="stats-summary">
+    <span class="loading">Loading stats...</span>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr id="table-header"></tr>
+      </thead>
+      <tbody id="table-body">
+        <tr><td class="loading">Loading symbols data...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function loadData() {
+      try {
+        const stats = await window.api.getStats();
+        
+        document.getElementById('stats-summary').innerHTML = `
+          <strong>Database:</strong> ${stats.db_path} | 
+          <strong>Size:</strong> ${stats.file_size} bytes | 
+          <strong>Total Rows:</strong> ${stats.total_rows} | 
+          <strong>Symbols Source:</strong> ${stats.source} (${stats.rows.length} matching)
+        `;
+
+        const theadTr = document.getElementById('table-header');
+        const tbody = document.getElementById('table-body');
+
+        if (stats.rows.length === 0) {
+          theadTr.innerHTML = '<th>Symbol</th>';
+          tbody.innerHTML = '<tr><td colspan="1">No matching rows found.</td></tr>';
+          return;
+        }
+
+        const columns = Object.keys(stats.rows[0]);
+        theadTr.innerHTML = columns.map(col => `<th>${col}</th>`).join('');
+
+        tbody.innerHTML = stats.rows.map(r => `
+          <tr>
+            ${columns.map(col => `<td>${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`).join('')}
+          </tr>
+        `).join('');
+      } catch (err) {
+        document.getElementById('stats-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
+        document.getElementById('table-body').innerHTML = `<tr><td colspan="1" style="color: red;">Failed to load data</td></tr>`;
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

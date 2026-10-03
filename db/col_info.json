@@ -35,5 +35,6 @@
     "EX_DATE": "Ex dividend date",
     "COMPANY": "Company name",
     "INDUSTRY": "Company industry",
+    "NET_WORTH": "Company net worth (total stockholders equity)",
     "UPDATED_AT": "Last update time"
 }

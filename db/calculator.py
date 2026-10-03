@@ -58,7 +58,7 @@ class DBRowCalculator:
         self.ebit_earnings = self._extract_financial_cell(self.income_statement, ["EBIT"])
         self.operating_income = self._extract_financial_cell(self.income_statement, ["Operating Income", "EBIT"])
         self.total_debt = self._extract_financial_cell(self.balance_sheet, ["Total Debt"])
-        self.total_equity = self._extract_financial_cell(self.balance_sheet, ["Total Stockholder Equity", "Total Equity"])
+        self.total_equity = self._extract_financial_cell(self.balance_sheet, ["Total Stockholder Equity", "Total Equity", "Stockholders Equity", "Common Stock Equity", "Total Equity Gross Minority Interest"])
         self.current_assets = self._extract_financial_cell(self.balance_sheet, ["Total Current Assets", "Current Assets"])
         self.current_liabilities = self._extract_financial_cell(self.balance_sheet, ["Total Current Liabilities", "Current Liabilities"])
         self.total_assets = self._extract_financial_cell(self.balance_sheet, ["Total Assets", "Assets"])
@@ -96,6 +96,7 @@ class DBRowCalculator:
             SCHEMA["CF_SHARE"].name: self._calc_cf_share(),
             SCHEMA["PAYOUT_RATIO"].name: self._calc_payout_ratio(),
             SCHEMA["DEBT_CAPITAL"].name: self._calc_debt_capital(),
+            SCHEMA["NET_WORTH"].name: self._calc_net_worth(),
             SCHEMA["REVENUE_1Y"].name: self._calc_revenue_1y(),
             SCHEMA["PEG"].name: self._calc_peg(),
             SCHEMA["P_E"].name: self._calc_p_e(),
@@ -279,6 +280,16 @@ class DBRowCalculator:
 
     def _calc_industry(self) -> str | None:
         return self.company_info.get("industry")
+
+    def _calc_net_worth(self) -> float | None:
+        if self.total_equity is not None:
+            return float(self.total_equity)
+        if self.book_value is not None and self.shares_outstanding is not None:
+            try:
+                return float(self.book_value) * float(self.shares_outstanding)
+            except (TypeError, ValueError):
+                pass
+        return None
 
     def _calc_updated_at(self) -> str | None:
         return format_date(datetime.now(timezone.utc))

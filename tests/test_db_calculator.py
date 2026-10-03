@@ -150,7 +150,7 @@ def test_jnj_reference_row(jnj_data):
         "DGR_1Y": 4.6843, "DGR_3Y": 4.9223, "DGR_5Y": 5.2485, "DGR_10Y": 5.7095,
         "CHOWDER": 7.2485, "ROE": 25.742, "NPM": 21.482, "ROTC": 17.6422,
         "CUR_R": 1.0277, "EPS_1Y": -0.9, "CF_SHARE": 10.1789, "PAYOUT_RATIO": 0.6079,
-        "DEBT_CAPITAL": 37.0205, "REVENUE_1Y": 6.6, "PEG": 2.81, "P_E": 30.716,
+        "DEBT_CAPITAL": 37.0205, "NET_WORTH": 81544000000.0, "REVENUE_1Y": 6.6, "PEG": 2.81, "P_E": 30.716,
         "P_BV": 7.5082, "FAIR_PRICE": 123.428, "PRICE_LOW": 182.94, "PRICE_HIGH": 281.07,
         "CUR_DIV": 1.34, "PREV_DIV": 1.34, "NUM_DIV_1Y": 4, "DIV_1Y": 5.28,
         "COMPANY": "Johnson & Johnson", "INDUSTRY": "Drug Manufacturers - General"

@@ -10,8 +10,7 @@
       padding: 20px;
       background: #1e1e1e;
       color: #cccccc;
-      height: 100vh;
-      overflow: hidden;
+      min-height: 100vh;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
@@ -35,11 +34,8 @@
       border: 1px solid #333333;
     }
     divi-table {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
+      display: block;
+      width: 100%;
     }
     .table-container {
       background: #252526;
@@ -47,8 +43,7 @@
       border: 1px solid #333333;
       overflow: auto;
       width: 100%;
-      flex: 1;
-      min-height: 0;
+      max-height: 60vh;
     }
     table {
       width: 100%;
@@ -105,9 +100,6 @@
     .view-content {
       display: none;
       flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      overflow: hidden;
     }
     .view-content.active {
       display: flex;
@@ -172,7 +164,7 @@
       <span class="loading">Loading stats...</span>
     </div>
 
-    <divi-table id-prefix="search" legend="in portfolio" legend-color="#10b981"></divi-table>
+    <divi-table id-prefix="search" legend="In portfolio" legend-color="#10b981"></divi-table>
   </div>
 
   <div id="view-analysis" class="view-content active">
@@ -187,7 +179,7 @@
       </div>
     </div>
 
-    <divi-table id-prefix="analysis" legend="DB filtered by stable dividend filter"></divi-table>
+    <divi-table id-prefix="analysis" legend="Filtered by stable dividend filter"></divi-table>
   </div>
 
   <script>

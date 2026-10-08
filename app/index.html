@@ -172,7 +172,7 @@
       <span class="loading">Loading stats...</span>
     </div>
 
-    <divi-table id-prefix="search" legend="Filtered out by search criteria"></divi-table>
+    <divi-table id-prefix="search" legend="in portfolio" legend-color="#10b981"></divi-table>
   </div>
 
   <div id="view-analysis" class="view-content active">
@@ -187,7 +187,7 @@
       </div>
     </div>
 
-    <divi-table id-prefix="analysis" legend="Filtered out by growing dividend filter"></divi-table>
+    <divi-table id-prefix="analysis" legend="DB filtered by stable dividend filter"></divi-table>
   </div>
 
   <script>
@@ -195,6 +195,7 @@
       connectedCallback() {
         const idPrefix = this.getAttribute('id-prefix') || 'table';
         const legendText = this.getAttribute('legend') || '';
+        const legendColor = this.getAttribute('legend-color') || '#facc15';
 
         this.innerHTML = `
           <div class="table-container">
@@ -203,7 +204,7 @@
                 <tr style="${legendText ? '' : 'display:none;'}">
                   <td colspan="100" style="background: #252526; color: #cccccc; padding: 10px 14px; border-bottom: 1px solid #333333;">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="display: inline-block; width: 14px; height: 14px; background: #facc15; border-radius: 2px; flex-shrink: 0;"></span>
+                      <span style="display: inline-block; width: 14px; height: 14px; background: ${legendColor}; border-radius: 2px; flex-shrink: 0;"></span>
                       <span id="${idPrefix}-legend-text">${legendText}</span>
                     </div>
                   </td>
@@ -271,7 +272,7 @@
         }
 
         tbody.innerHTML = stats.holdings.map(h => `
-          <tr ${h.filtered_out ? 'style="color: #facc15;"' : ''}>
+          <tr ${h.db_filtered ? 'style="color: #facc15;"' : ''}>
             <td>${h.symbol}</td>
             <td>${h.company}</td>
             <td>${h.shares}</td>
@@ -363,19 +364,25 @@
 
         const columns = Object.keys(stats.rows[0]);
         const colInfo = stats.col_info || {};
+        const portfolioSymbols = new Set((stats.portfolio_symbols || []).map(s => s.toUpperCase()));
+
         theadTr.innerHTML = columns.map(col => {
           const desc = colInfo[col] || col;
           return `<th title="${desc}">${col}</th>`;
         }).join('');
 
-        tbody.innerHTML = stats.rows.map(r => `
-          <tr>
-            ${columns.map(col => {
-              const desc = colInfo[col] || '';
-              return `<td title="${desc}">${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`;
-            }).join('')}
-          </tr>
-        `).join('');
+        tbody.innerHTML = stats.rows.map(r => {
+          const sym = (r.SYMBOL !== undefined ? r.SYMBOL : r[columns[0]]) || '';
+          const isInPortfolio = portfolioSymbols.has(String(sym).toUpperCase());
+          return `
+            <tr ${isInPortfolio ? 'style="color: #10b981;"' : ''}>
+              ${columns.map(col => {
+                const desc = colInfo[col] || '';
+                return `<td title="${desc}">${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`;
+              }).join('')}
+            </tr>
+          `;
+        }).join('');
         document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
       } catch (err) {
         document.getElementById('stats-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;

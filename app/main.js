@@ -81,6 +81,18 @@ ipcMain.handle('get-stats', async () => {
     } catch (e) {}
   }
 
+  let portfolio_symbols = [];
+  const portfolioPath = path.join(rootDir, '.app', 'portfolio.json');
+  if (fs.existsSync(portfolioPath)) {
+    try {
+      const content = fs.readFileSync(portfolioPath, 'utf8');
+      const parsed = JSON.parse(content);
+      if (parsed.holdings && Array.isArray(parsed.holdings)) {
+        portfolio_symbols = parsed.holdings.map(h => (h.s || '').toUpperCase());
+      }
+    } catch (e) {}
+  }
+
   return {
     db_path: dbPath,
     file_size,
@@ -88,7 +100,8 @@ ipcMain.handle('get-stats', async () => {
     source,
     symbols,
     rows,
-    col_info
+    col_info,
+    portfolio_symbols
   };
 });
 
@@ -116,7 +129,7 @@ ipcMain.handle('get-portfolio-stats', async () => {
 
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
-    h.filtered_out = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+    h.db_filtered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
   }
 
   if (fs.existsSync(portfolioPath)) {
@@ -168,7 +181,7 @@ ipcMain.handle('get-portfolio-stats', async () => {
       holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
-      filtered_out: !!h.filtered_out
+      db_filtered: !!h.db_filtered
     });
   }
 

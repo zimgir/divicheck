@@ -98,11 +98,30 @@ ipcMain.handle('get-portfolio-stats', async () => {
   const portfolioPath = path.join(rootDir, '.app', 'portfolio.json');
 
   let holdings = [];
+  let parsedPortfolio = {};
   if (fs.existsSync(portfolioPath)) {
     try {
       const content = fs.readFileSync(portfolioPath, 'utf8');
-      const parsed = JSON.parse(content);
-      holdings = parsed.holdings || [];
+      parsedPortfolio = JSON.parse(content);
+      holdings = parsedPortfolio.holdings || [];
+    } catch (e) {}
+  }
+
+  let dividendSymbols = new Set();
+  const symbolsDivPath = path.join(rootDir, '.db', 'symbols_dividend.txt');
+  if (fs.existsSync(symbolsDivPath)) {
+    const content = fs.readFileSync(symbolsDivPath, 'utf8');
+    dividendSymbols = new Set(content.split(/\r?\n/).map(s => s.trim().toUpperCase()).filter(Boolean));
+  }
+
+  for (const h of holdings) {
+    const sym = (h.s || '').toUpperCase();
+    h.filtered_out = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+  }
+
+  if (fs.existsSync(portfolioPath)) {
+    try {
+      fs.writeFileSync(portfolioPath, JSON.stringify(parsedPortfolio, null, 4), 'utf8');
     } catch (e) {}
   }
 
@@ -148,7 +167,8 @@ ipcMain.handle('get-portfolio-stats', async () => {
       price: price ? price.toFixed(2) : 'N/A',
       holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
-      yield_1y: yield1y ? yield1y.toFixed(2) : '0.00'
+      yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
+      filtered_out: !!h.filtered_out
     });
   }
 

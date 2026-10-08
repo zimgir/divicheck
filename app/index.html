@@ -58,11 +58,27 @@
     th {
       background: #2d2d2d;
       position: sticky;
-      top: 0;
+      top: var(--sticky-header-height, 0);
       z-index: 2;
       font-weight: 600;
       color: #ffffff;
       border-bottom: 2px solid #3f3f46;
+    }
+    .table-legend {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #252526;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #cccccc;
+      border-bottom: 1px solid #333333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #view-analysis th {
+      top: var(--legend-height, 38px);
     }
     tr:hover {
       background: #2a2d2e;
@@ -137,10 +153,8 @@
       background: #1e1e1e;
       padding-top: 0;
       padding-bottom: 10px;
-      margin-bottom: 0;
+      margin-bottom: 20px;
       box-sizing: border-box;
-      will-change: transform;
-      transform: translateZ(0);
     }
     .analysis-top-panel .stats-card {
       flex: 1;
@@ -156,16 +170,6 @@
     <div class="tab-panel">
       <button class="tab-btn active" onclick="switchView('analysis')">analysis</button>
       <button class="tab-btn" onclick="switchView('search')">search</button>
-    </div>
-    <div id="sticky-analysis-panel" class="analysis-top-panel">
-      <div class="stats-card" id="analysis-summary">
-        <span class="loading">Loading analysis...</span>
-      </div>
-      <div class="stats-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
-        <div style="width: 100%; height: 180px; position: relative;">
-          <canvas id="sectorPieChart"></canvas>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -187,7 +191,22 @@
   </div>
 
   <div id="view-analysis" class="view-content active">
+    <div id="sticky-analysis-panel" class="analysis-top-panel">
+      <div class="stats-card" id="analysis-summary">
+        <span class="loading">Loading analysis...</span>
+      </div>
+      <div class="stats-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <div style="width: 100%; height: 180px; position: relative;">
+          <canvas id="sectorPieChart"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div class="table-container">
+      <div id="analysis-legend" class="table-legend">
+        <span style="display: inline-block; width: 14px; height: 14px; background: #facc15; border-radius: 2px; flex-shrink: 0;"></span>
+        <span>Filtered out by growing dividend filter</span>
+      </div>
       <table>
         <thead>
           <tr>
@@ -212,17 +231,13 @@
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.view-content').forEach(view => view.classList.remove('active'));
 
-      const analysisPanel = document.getElementById('sticky-analysis-panel');
-
       if (viewName === 'analysis') {
         document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
         document.getElementById('view-analysis').classList.add('active');
-        analysisPanel.style.display = 'flex';
         loadAnalysis();
       } else if (viewName === 'search') {
         document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
         document.getElementById('view-search').classList.add('active');
-        analysisPanel.style.display = 'none';
         loadData();
       }
     }
@@ -248,7 +263,7 @@
         }
 
         tbody.innerHTML = stats.holdings.map(h => `
-          <tr>
+          <tr ${h.filtered_out ? 'style="color: #facc15;"' : ''}>
             <td>${h.symbol}</td>
             <td>${h.company}</td>
             <td>${h.shares}</td>
@@ -309,6 +324,13 @@
             }
           }
         });
+        const legend = document.getElementById('analysis-legend');
+        if (legend) {
+          const height = legend.offsetHeight;
+          document.querySelectorAll('#view-analysis th').forEach(th => {
+            th.style.top = height + 'px';
+          });
+        }
       } catch (err) {
         document.getElementById('analysis-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
         document.getElementById('analysis-table-body').innerHTML = `<tr><td colspan="7" style="color: red;">Failed to load portfolio analysis</td></tr>`;
@@ -357,6 +379,16 @@
         document.getElementById('table-body').innerHTML = `<tr><td colspan="1" style="color: red;">Failed to load data</td></tr>`;
       }
     }
+
+    window.addEventListener('resize', () => {
+      const legend = document.getElementById('analysis-legend');
+      if (legend) {
+        const height = legend.offsetHeight;
+        document.querySelectorAll('#view-analysis th').forEach(th => {
+          th.style.top = height + 'px';
+        });
+      }
+    });
 
     window.onload = async () => {
       while (!window.api || !window.api.getPortfolioStats) {

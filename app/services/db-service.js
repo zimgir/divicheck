@@ -92,6 +92,10 @@ function parseDateTimestamp(dateStr) {
   return isNaN(ts) ? 0 : ts;
 }
 
+function compareDbDates(dateStr1, dateStr2) {
+  return parseDateTimestamp(dateStr1) - parseDateTimestamp(dateStr2);
+}
+
 function isRecordComplete(rec) {
   if (!rec || typeof rec !== 'object') return false;
   const required = ['date', 'price', 'shares', 'yearly_dividend', 'yield'];
@@ -190,9 +194,7 @@ function getPortfolioStats() {
       portfolioUpdated = true;
     }
 
-    const initTs = parseDateTimestamp(symbolRecords.init?.date);
-    const updateTs = parseDateTimestamp(symbolRecords.last_update?.date);
-    if (symbolRecords.init && symbolRecords.last_update && initTs > updateTs) {
+    if (symbolRecords.init && symbolRecords.last_update && compareDbDates(symbolRecords.init.date, symbolRecords.last_update.date) > 0) {
       symbolRecords.init = JSON.parse(JSON.stringify(symbolRecords.last_update));
       portfolioUpdated = true;
     }
@@ -263,5 +265,9 @@ function getPortfolioStats() {
 
 module.exports = {
   getStats,
-  getPortfolioStats
+  getPortfolioStats,
+  parseDateTimestamp,
+  compareDbDates,
+  isRecordComplete,
+  getFormattedDate
 };

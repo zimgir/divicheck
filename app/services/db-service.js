@@ -107,14 +107,22 @@ function getPortfolioStats() {
   const rootDir = path.resolve(__dirname, '..', '..');
   const dbPath = path.join(rootDir, '.db', 'divicheck.db');
   const portfolioPath = path.join(rootDir, '.app', 'portfolio.json');
+  const metaPath = path.join(rootDir, '.app', 'portfolio-meta.json');
 
   let holdings = [];
-  let parsedPortfolio = {};
   if (fs.existsSync(portfolioPath)) {
     try {
       const content = fs.readFileSync(portfolioPath, 'utf8');
-      parsedPortfolio = JSON.parse(content);
-      holdings = parsedPortfolio.holdings || [];
+      const parsed = JSON.parse(content);
+      holdings = parsed.holdings || [];
+    } catch (e) {}
+  }
+
+  let parsedMeta = { flags: {}, records: {} };
+  if (fs.existsSync(metaPath)) {
+    try {
+      const content = fs.readFileSync(metaPath, 'utf8');
+      parsedMeta = JSON.parse(content);
     } catch (e) {}
   }
 
@@ -141,22 +149,22 @@ function getPortfolioStats() {
     }
   }
 
-  parsedPortfolio.records = parsedPortfolio.records || {};
-  parsedPortfolio.flags = parsedPortfolio.flags || {};
+  parsedMeta.records = parsedMeta.records || {};
+  parsedMeta.flags = parsedMeta.flags || {};
   let portfolioUpdated = false;
 
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
     const isFiltered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
 
-    parsedPortfolio.flags[sym] = parsedPortfolio.flags[sym] || {};
-    if (parsedPortfolio.flags[sym].db_filtered !== isFiltered) {
-      parsedPortfolio.flags[sym].db_filtered = isFiltered;
+    parsedMeta.flags[sym] = parsedMeta.flags[sym] || {};
+    if (parsedMeta.flags[sym].db_filtered !== isFiltered) {
+      parsedMeta.flags[sym].db_filtered = isFiltered;
       portfolioUpdated = true;
     }
 
-    parsedPortfolio.records[sym] = parsedPortfolio.records[sym] || {};
-    const symbolRecords = parsedPortfolio.records[sym];
+    parsedMeta.records[sym] = parsedMeta.records[sym] || {};
+    const symbolRecords = parsedMeta.records[sym];
 
     const stock = dbRows[sym] || {};
     const price = Number(stock.PRICE) || 0;
@@ -190,9 +198,9 @@ function getPortfolioStats() {
     }
   }
 
-  if (portfolioUpdated && fs.existsSync(portfolioPath)) {
+  if (portfolioUpdated) {
     try {
-      fs.writeFileSync(portfolioPath, JSON.stringify(parsedPortfolio, null, 4), 'utf8');
+      fs.writeFileSync(metaPath, JSON.stringify(parsedMeta, null, 4), 'utf8');
     } catch (e) {}
   }
 
@@ -224,7 +232,7 @@ function getPortfolioStats() {
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
       updated_at: stock.UPDATED_AT || 'N/A',
-      db_filtered: !!(parsedPortfolio.flags && parsedPortfolio.flags[symbol] && parsedPortfolio.flags[symbol].db_filtered)
+      db_filtered: !!(parsedMeta.flags && parsedMeta.flags[symbol] && parsedMeta.flags[symbol].db_filtered)
     });
   }
 

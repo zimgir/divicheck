@@ -33,10 +33,11 @@ export async function loadData() {
       const sym = (r.SYMBOL !== undefined ? r.SYMBOL : r[columns[0]]) || '';
       const isInPortfolio = portfolioSymbols.has(String(sym).toUpperCase());
       return `
-        <tr ${isInPortfolio ? 'style="color: #10b981;"' : ''}>
-          ${columns.map(col => {
+        <tr>
+          ${columns.map((col, idx) => {
             const desc = colInfo[col] || '';
-            return `<td title="${desc}">${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`;
+            const cellStyle = (idx === 0 && isInPortfolio) ? 'style="color: #10b981;"' : '';
+            return `<td title="${desc}" ${cellStyle}>${r[col] !== null && r[col] !== undefined ? r[col] : ''}</td>`;
           }).join('')}
         </tr>
       `;

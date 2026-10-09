@@ -32,8 +32,8 @@ export async function loadAnalysis() {
     }
 
     tbody.innerHTML = stats.holdings.map(h => `
-      <tr ${h.db_filtered ? 'style="color: #facc15;"' : ''}>
-        <td>${h.symbol}</td>
+      <tr>
+        <td ${h.db_filtered ? 'style="color: #facc15;"' : ''}>${h.symbol}</td>
         <td>${h.company}</td>
         <td>${h.shares}</td>
         <td>$${h.price}</td>

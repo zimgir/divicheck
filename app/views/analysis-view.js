@@ -36,7 +36,6 @@ if (document.readyState === 'loading') {
 }
 
 export async function loadAnalysis() {
-  initAnalysisView();
   try {
     const stats = await window.api.getPortfolioStats();
 
@@ -50,7 +49,11 @@ export async function loadAnalysis() {
         <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}</td></tr>
         <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
       </table>
+      <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+        <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+      </div>
     `;
+    initAnalysisView();
 
     const theadTr = document.getElementById('analysis-header');
     if (theadTr) {
@@ -144,7 +147,13 @@ export async function loadAnalysis() {
     });
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
   } catch (err) {
-    document.getElementById('analysis-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
+    document.getElementById('analysis-summary').innerHTML = `
+      <span style="color: red;">Error: ${err.message}</span>
+      <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+        <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+      </div>
+    `;
+    initAnalysisView();
     document.getElementById('analysis-body').innerHTML = `<tr><td colspan="8" style="color: red;">Failed to load portfolio analysis</td></tr>`;
     const noDataMsg = document.getElementById('pie-no-data-msg');
     if (noDataMsg) noDataMsg.style.display = 'flex';

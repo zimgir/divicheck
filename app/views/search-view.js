@@ -33,7 +33,7 @@ export async function loadData() {
       const sym = (r.SYMBOL !== undefined ? r.SYMBOL : r[columns[0]]) || '';
       const isInPortfolio = portfolioSymbols.has(String(sym).toUpperCase());
       return `
-        <tr>
+        <tr ${isInPortfolio ? 'data-legend-index="0"' : ''}>
           ${columns.map((col, idx) => {
             const desc = colInfo[col] || '';
             const cellStyle = (idx === 0 && isInPortfolio) ? 'style="color: #10b981;"' : '';

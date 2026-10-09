@@ -107,7 +107,7 @@ export async function loadAnalysis() {
     if (noDataMsg) noDataMsg.style.display = 'none';
 
     tbody.innerHTML = stats.holdings.map(h => `
-      <tr>
+      <tr ${h.db_filtered ? 'data-legend-index="0"' : ''}>
         <td ${h.db_filtered ? 'style="color: #facc15;"' : ''}>${h.symbol}</td>
         <td>${h.company}</td>
         <td>${h.shares}</td>

@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { getStats, getPortfolioStats, setPortfolioDir, resetPortfolio } = require('./services/db-service');
+const { getStats, getPortfolioStats, setPortfolioDir, resetPortfolio, getLastOpenPath } = require('./services/db-service');
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -60,4 +60,8 @@ ipcMain.handle('set-portfolio-dir', async (event, dirPath) => {
 
 ipcMain.handle('reset-portfolio', async () => {
   return resetPortfolio();
+});
+
+ipcMain.handle('get-last-open-path', async () => {
+  return getLastOpenPath();
 });

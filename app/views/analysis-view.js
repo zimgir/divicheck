@@ -1,4 +1,6 @@
-function showPopup(msg) {
+function showPopup(msg, title = 'Error') {
+  const titleEl = document.getElementById('popup-title');
+  if (titleEl) titleEl.textContent = title;
   document.getElementById('popup-message').textContent = msg;
   document.getElementById('popup-modal').style.display = 'flex';
 }
@@ -35,7 +37,25 @@ if (document.readyState === 'loading') {
   initAnalysisView();
 }
 
+let hasInitializedStartup = false;
+
+async function checkStartupPortfolio() {
+  if (hasInitializedStartup) return;
+  hasInitializedStartup = true;
+  try {
+    const lastPath = await window.api.getLastOpenPath();
+    if (lastPath) {
+      const res = await window.api.setPortfolioDir(lastPath);
+      if (!res.success) {
+        showPopup(res.error);
+        await window.api.resetPortfolio();
+      }
+    }
+  } catch (e) {}
+}
+
 export async function loadAnalysis() {
+  await checkStartupPortfolio();
   try {
     const stats = await window.api.getPortfolioStats();
 

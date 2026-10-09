@@ -111,23 +111,74 @@ function isRecordComplete(rec) {
 
 let currentPortfolioDir = null;
 
+function getLastOpenPath() {
+  const rootDir = path.resolve(__dirname, '..', '..');
+  const metaPath = path.join(rootDir, '.app', 'analysis-meta.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      return meta.last_open_path || null;
+    } catch (e) {}
+  }
+  return null;
+}
+
 function setPortfolioDir(dirPath) {
   const portfolioPath = path.join(dirPath, 'portfolio.json');
   if (!fs.existsSync(portfolioPath)) {
-    return { success: false, error: 'portfolio.json is not found in the selected dir.' };
+    return { success: false, error: `portfolio.json not found at path: ${portfolioPath}` };
   }
   try {
     const content = fs.readFileSync(portfolioPath, 'utf8');
-    JSON.parse(content);
+    const parsed = JSON.parse(content);
+    if (!parsed.holdings || !Array.isArray(parsed.holdings)) {
+      return { success: false, error: `Invalid portfolio.json: Expected 'holdings' field as an array.` };
+    }
+    for (let i = 0; i < parsed.holdings.length; i++) {
+      const h = parsed.holdings[i];
+      if (!h || typeof h !== 'object' || typeof h.s !== 'string' || h.s.trim() === '' || h.n === undefined || h.n === null) {
+        return { success: false, error: `Invalid portfolio.json: Holding at index ${i} has invalid structure (expected symbol 's' and shares 'n').` };
+      }
+    }
   } catch (err) {
-    return { success: false, error: err.message };
+    if (err.success === false || (err.message && err.message.startsWith('Invalid portfolio.json'))) {
+      return err.success === false ? err : { success: false, error: err.message };
+    }
+    return { success: false, error: `Failed to parse JSON in ${portfolioPath}: ${err.message}` };
   }
   currentPortfolioDir = dirPath;
+
+  const rootDir = path.resolve(__dirname, '..', '..');
+  const appDir = path.join(rootDir, '.app');
+  if (!fs.existsSync(appDir)) {
+    fs.mkdirSync(appDir, { recursive: true });
+  }
+  const metaPath = path.join(appDir, 'analysis-meta.json');
+  let meta = {};
+  if (fs.existsSync(metaPath)) {
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (e) {}
+  }
+  meta.last_open_path = dirPath;
+  try {
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 4), 'utf8');
+  } catch (e) {}
+
   return { success: true };
 }
 
 function resetPortfolio() {
   currentPortfolioDir = null;
+  const rootDir = path.resolve(__dirname, '..', '..');
+  const metaPath = path.join(rootDir, '.app', 'analysis-meta.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      delete meta.last_open_path;
+      fs.writeFileSync(metaPath, JSON.stringify(meta, null, 4), 'utf8');
+    } catch (e) {}
+  }
   return { success: true };
 }
 
@@ -301,6 +352,7 @@ module.exports = {
   getPortfolioStats,
   setPortfolioDir,
   resetPortfolio,
+  getLastOpenPath,
   parseDateTimestamp,
   compareDbDates,
   isRecordComplete,

@@ -114,11 +114,13 @@ function getPortfolioStats() {
   const metaPath = path.join(rootDir, '.app', 'portfolio-meta.json');
 
   let holdings = [];
+  let portfolioName = 'N/A';
   if (fs.existsSync(portfolioPath)) {
     try {
       const content = fs.readFileSync(portfolioPath, 'utf8');
       const parsed = JSON.parse(content);
       holdings = parsed.holdings || [];
+      portfolioName = parsed.name || 'N/A';
     } catch (e) {}
   }
 
@@ -251,6 +253,8 @@ function getPortfolioStats() {
   const expectedMonthlyDividend = totalYearlyDividend / 12;
 
   return {
+    portfolio_name: portfolioName,
+    portfolio_path: path.dirname(portfolioPath),
     total_holdings_value: totalHoldingsValue.toFixed(2),
     average_dividend_yield: averageDividendYield.toFixed(2),
     expected_total_yearly_dividend: totalYearlyDividend.toFixed(2),

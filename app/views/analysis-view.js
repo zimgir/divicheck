@@ -4,11 +4,13 @@ export async function loadAnalysis() {
 
     document.getElementById('analysis-summary').innerHTML = `
       <table>
+        <tr><td><strong>Portfolio Name:</strong></td><td>${stats.portfolio_name}</td></tr>
         <tr><td><strong>Number of Holdings:</strong></td><td>${stats.holdings.length}</td></tr>
         <tr><td><strong>Total Holdings Value:</strong></td><td>$${stats.total_holdings_value}</td></tr>
         <tr><td><strong>Average Dividend Yield:</strong></td><td>${stats.average_dividend_yield}%</td></tr>
         <tr><td><strong>Expected Total Yearly Dividend:</strong></td><td>$${stats.expected_total_yearly_dividend}</td></tr>
         <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}</td></tr>
+        <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
       </table>
     `;
 

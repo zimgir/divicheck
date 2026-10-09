@@ -73,6 +73,36 @@ function getStats() {
   };
 }
 
+function getFormattedDate() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const year = now.getFullYear();
+  const month = pad(now.getMonth() + 1);
+  const day = pad(now.getDate());
+  const hours = pad(now.getHours());
+  const minutes = pad(now.getMinutes());
+  const seconds = pad(now.getSeconds());
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function parseDateTimestamp(dateStr) {
+  if (!dateStr) return 0;
+  const normalized = typeof dateStr === 'string' ? dateStr.replace(' ', 'T') : dateStr;
+  const ts = Date.parse(normalized);
+  return isNaN(ts) ? 0 : ts;
+}
+
+function isRecordComplete(rec) {
+  if (!rec || typeof rec !== 'object') return false;
+  const required = ['date', 'price', 'shares', 'yearly_dividend', 'yield'];
+  for (const field of required) {
+    if (rec[field] === undefined || rec[field] === null || rec[field] === '') {
+      return false;
+    }
+  }
+  return true;
+}
+
 function getPortfolioStats() {
   const rootDir = path.resolve(__dirname, '..', '..');
   const dbPath = path.join(rootDir, '.db', 'divicheck.db');
@@ -95,17 +125,6 @@ function getPortfolioStats() {
     dividendSymbols = new Set(content.split(/\r?\n/).map(s => s.trim().toUpperCase()).filter(Boolean));
   }
 
-  for (const h of holdings) {
-    const sym = (h.s || '').toUpperCase();
-    h.db_filtered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
-  }
-
-  if (fs.existsSync(portfolioPath)) {
-    try {
-      fs.writeFileSync(portfolioPath, JSON.stringify(parsedPortfolio, null, 4), 'utf8');
-    } catch (e) {}
-  }
-
   let dbRows = {};
   if (fs.existsSync(dbPath) && holdings.length > 0) {
     const db = new Database(dbPath, { readonly: true });
@@ -120,6 +139,54 @@ function getPortfolioStats() {
     } finally {
       db.close();
     }
+  }
+
+  parsedPortfolio.records = parsedPortfolio.records || {};
+  let portfolioUpdated = false;
+
+  for (const h of holdings) {
+    const sym = (h.s || '').toUpperCase();
+    h.db_filtered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+
+    parsedPortfolio.records[sym] = parsedPortfolio.records[sym] || {};
+    const symbolRecords = parsedPortfolio.records[sym];
+
+    const stock = dbRows[sym] || {};
+    const price = Number(stock.PRICE) || 0;
+    const shares = Number(h.n) || 0;
+    const div1y = stock.DIV_1Y !== null && stock.DIV_1Y !== undefined ? Number(stock.DIV_1Y) : (Number(stock.CUR_DIV || 0) * Number(stock.NUM_DIV_1Y || 4));
+    const yield1y = stock.YIELD_1Y !== null && stock.YIELD_1Y !== undefined ? Number(stock.YIELD_1Y) : (price > 0 ? (div1y / price) * 100 : 0);
+    const dateStr = stock.UPDATED_AT || getFormattedDate();
+
+    const recordData = {
+      date: dateStr,
+      price: Number(price.toFixed(2)),
+      shares: shares,
+      yearly_dividend: Number(div1y.toFixed(2)),
+      yield: Number(yield1y.toFixed(2))
+    };
+
+    if (!isRecordComplete(symbolRecords.init)) {
+      symbolRecords.init = recordData;
+      portfolioUpdated = true;
+    }
+    if (!isRecordComplete(symbolRecords.last_update)) {
+      symbolRecords.last_update = recordData;
+      portfolioUpdated = true;
+    }
+
+    const initTs = parseDateTimestamp(symbolRecords.init?.date);
+    const updateTs = parseDateTimestamp(symbolRecords.last_update?.date);
+    if (symbolRecords.init && symbolRecords.last_update && initTs > updateTs) {
+      symbolRecords.init = JSON.parse(JSON.stringify(symbolRecords.last_update));
+      portfolioUpdated = true;
+    }
+  }
+
+  if (portfolioUpdated && fs.existsSync(portfolioPath)) {
+    try {
+      fs.writeFileSync(portfolioPath, JSON.stringify(parsedPortfolio, null, 4), 'utf8');
+    } catch (e) {}
   }
 
   let totalHoldingsValue = 0;

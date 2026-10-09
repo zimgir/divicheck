@@ -22,12 +22,13 @@ export async function loadAnalysis() {
         <th>Holding Value ($)</th>
         <th>Yearly Dividend ($)</th>
         <th>Yield (%)</th>
+        <th>Last Updated</th>
       `;
     }
 
     const tbody = document.getElementById('analysis-body');
     if (!stats.holdings || stats.holdings.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7">No holdings found! check .app/portfolio.json</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8">No holdings found! check .app/portfolio.json</td></tr>';
       return;
     }
 
@@ -40,6 +41,7 @@ export async function loadAnalysis() {
         <td>$${h.holding_value}</td>
         <td>$${h.yearly_dividend}</td>
         <td>${h.yield_1y}%</td>
+        <td>${h.updated_at}</td>
       </tr>
     `).join('');
 
@@ -96,6 +98,6 @@ export async function loadAnalysis() {
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
   } catch (err) {
     document.getElementById('analysis-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
-    document.getElementById('analysis-body').innerHTML = `<tr><td colspan="7" style="color: red;">Failed to load portfolio analysis</td></tr>`;
+    document.getElementById('analysis-body').innerHTML = `<tr><td colspan="8" style="color: red;">Failed to load portfolio analysis</td></tr>`;
   }
 }

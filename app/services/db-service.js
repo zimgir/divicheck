@@ -223,6 +223,7 @@ function getPortfolioStats() {
       holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
+      updated_at: stock.UPDATED_AT || 'N/A',
       db_filtered: !!(parsedPortfolio.flags && parsedPortfolio.flags[symbol] && parsedPortfolio.flags[symbol].db_filtered)
     });
   }

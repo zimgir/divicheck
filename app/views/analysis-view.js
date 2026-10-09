@@ -1,4 +1,42 @@
+function showPopup(msg) {
+  document.getElementById('popup-message').textContent = msg;
+  document.getElementById('popup-modal').style.display = 'flex';
+}
+
+function initAnalysisView() {
+  const okBtn = document.getElementById('popup-ok-btn');
+  if (okBtn && !okBtn.dataset.bound) {
+    okBtn.dataset.bound = 'true';
+    okBtn.addEventListener('click', () => {
+      document.getElementById('popup-modal').style.display = 'none';
+    });
+  }
+  const openBtn = document.getElementById('open-portfolio-btn');
+  if (openBtn && !openBtn.dataset.bound) {
+    openBtn.dataset.bound = 'true';
+    openBtn.addEventListener('click', async () => {
+      const dirPath = await window.api.selectPortfolioFolder();
+      if (!dirPath) return;
+      const res = await window.api.setPortfolioDir(dirPath);
+      if (!res.success) {
+        showPopup(res.error);
+        await window.api.resetPortfolio();
+        loadAnalysis();
+      } else {
+        loadAnalysis();
+      }
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAnalysisView);
+} else {
+  initAnalysisView();
+}
+
 export async function loadAnalysis() {
+  initAnalysisView();
   try {
     const stats = await window.api.getPortfolioStats();
 
@@ -29,10 +67,21 @@ export async function loadAnalysis() {
     }
 
     const tbody = document.getElementById('analysis-body');
+    const noDataMsg = document.getElementById('pie-no-data-msg');
+
+    if (window.sectorChartInstance) {
+      window.sectorChartInstance.destroy();
+      window.sectorChartInstance = null;
+    }
+
     if (!stats.holdings || stats.holdings.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8">No holdings found! check .app/portfolio.json</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8">No data</td></tr>';
+      if (noDataMsg) noDataMsg.style.display = 'flex';
+      document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
       return;
     }
+
+    if (noDataMsg) noDataMsg.style.display = 'none';
 
     tbody.innerHTML = stats.holdings.map(h => `
       <tr>
@@ -48,10 +97,6 @@ export async function loadAnalysis() {
     `).join('');
 
     const ctx = document.getElementById('sectorPieChart').getContext('2d');
-    if (window.sectorChartInstance) {
-      window.sectorChartInstance.destroy();
-    }
-
     const sectorColors = [
       '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
       '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#84cc16',
@@ -101,5 +146,7 @@ export async function loadAnalysis() {
   } catch (err) {
     document.getElementById('analysis-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
     document.getElementById('analysis-body').innerHTML = `<tr><td colspan="8" style="color: red;">Failed to load portfolio analysis</td></tr>`;
+    const noDataMsg = document.getElementById('pie-no-data-msg');
+    if (noDataMsg) noDataMsg.style.display = 'flex';
   }
 }

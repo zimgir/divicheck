@@ -50,15 +50,17 @@ function getStats() {
   }
 
   let portfolio_symbols = [];
-  const portfolioPath = path.join(rootDir, '.app', 'portfolio.json');
-  if (fs.existsSync(portfolioPath)) {
-    try {
-      const content = fs.readFileSync(portfolioPath, 'utf8');
-      const parsed = JSON.parse(content);
-      if (parsed.holdings && Array.isArray(parsed.holdings)) {
-        portfolio_symbols = parsed.holdings.map(h => (h.s || '').toUpperCase());
-      }
-    } catch (e) {}
+  if (currentPortfolioDir) {
+    const portfolioPath = path.join(currentPortfolioDir, 'portfolio.json');
+    if (fs.existsSync(portfolioPath)) {
+      try {
+        const content = fs.readFileSync(portfolioPath, 'utf8');
+        const parsed = JSON.parse(content);
+        if (parsed.holdings && Array.isArray(parsed.holdings)) {
+          portfolio_symbols = parsed.holdings.map(h => (h.s || '').toUpperCase());
+        }
+      } catch (e) {}
+    }
   }
 
   return {
@@ -107,25 +109,52 @@ function isRecordComplete(rec) {
   return true;
 }
 
+let currentPortfolioDir = null;
+
+function setPortfolioDir(dirPath) {
+  const portfolioPath = path.join(dirPath, 'portfolio.json');
+  if (!fs.existsSync(portfolioPath)) {
+    return { success: false, error: 'portfolio.json is not found in the selected dir.' };
+  }
+  try {
+    const content = fs.readFileSync(portfolioPath, 'utf8');
+    JSON.parse(content);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+  currentPortfolioDir = dirPath;
+  return { success: true };
+}
+
+function resetPortfolio() {
+  currentPortfolioDir = null;
+  return { success: true };
+}
+
 function getPortfolioStats() {
   const rootDir = path.resolve(__dirname, '..', '..');
   const dbPath = path.join(rootDir, '.db', 'divicheck.db');
-  const portfolioPath = path.join(rootDir, '.app', 'portfolio.json');
-  const metaPath = path.join(rootDir, '.app', 'portfolio-meta.json');
 
   let holdings = [];
   let portfolioName = 'N/A';
-  if (fs.existsSync(portfolioPath)) {
-    try {
-      const content = fs.readFileSync(portfolioPath, 'utf8');
-      const parsed = JSON.parse(content);
-      holdings = parsed.holdings || [];
-      portfolioName = parsed.name || 'N/A';
-    } catch (e) {}
+  let portfolioPath = '';
+  let metaPath = '';
+
+  if (currentPortfolioDir) {
+    portfolioPath = path.join(currentPortfolioDir, 'portfolio.json');
+    metaPath = path.join(currentPortfolioDir, 'portfolio-meta.json');
+    if (fs.existsSync(portfolioPath)) {
+      try {
+        const content = fs.readFileSync(portfolioPath, 'utf8');
+        const parsed = JSON.parse(content);
+        holdings = parsed.holdings || [];
+        portfolioName = parsed.name || 'N/A';
+      } catch (e) {}
+    }
   }
 
   let parsedMeta = { flags: {}, records: {} };
-  if (fs.existsSync(metaPath)) {
+  if (metaPath && fs.existsSync(metaPath)) {
     try {
       const content = fs.readFileSync(metaPath, 'utf8');
       parsedMeta = JSON.parse(content);
@@ -254,7 +283,7 @@ function getPortfolioStats() {
 
   return {
     portfolio_name: portfolioName,
-    portfolio_path: path.dirname(portfolioPath),
+    portfolio_path: currentPortfolioDir ? currentPortfolioDir : 'N/A',
     total_holdings_value: totalHoldingsValue.toFixed(2),
     average_dividend_yield: averageDividendYield.toFixed(2),
     expected_total_yearly_dividend: totalYearlyDividend.toFixed(2),
@@ -270,6 +299,8 @@ function getPortfolioStats() {
 module.exports = {
   getStats,
   getPortfolioStats,
+  setPortfolioDir,
+  resetPortfolio,
   parseDateTimestamp,
   compareDbDates,
   isRecordComplete,

@@ -142,11 +142,18 @@ function getPortfolioStats() {
   }
 
   parsedPortfolio.records = parsedPortfolio.records || {};
+  parsedPortfolio.flags = parsedPortfolio.flags || {};
   let portfolioUpdated = false;
 
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
-    h.db_filtered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+    const isFiltered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+
+    parsedPortfolio.flags[sym] = parsedPortfolio.flags[sym] || {};
+    if (parsedPortfolio.flags[sym].db_filtered !== isFiltered) {
+      parsedPortfolio.flags[sym].db_filtered = isFiltered;
+      portfolioUpdated = true;
+    }
 
     parsedPortfolio.records[sym] = parsedPortfolio.records[sym] || {};
     const symbolRecords = parsedPortfolio.records[sym];
@@ -216,7 +223,7 @@ function getPortfolioStats() {
       holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
-      db_filtered: !!h.db_filtered
+      db_filtered: !!(parsedPortfolio.flags && parsedPortfolio.flags[symbol] && parsedPortfolio.flags[symbol].db_filtered)
     });
   }
 

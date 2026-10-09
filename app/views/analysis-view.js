@@ -142,12 +142,14 @@ export async function loadAnalysis() {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'right',
+            position: 'bottom',
+            align: 'start',
             labels: {
               color: '#cccccc',
               boxWidth: 12,
+              padding: 10,
               font: {
-                size: 13
+                size: 12
               }
             }
           },

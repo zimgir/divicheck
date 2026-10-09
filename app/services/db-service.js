@@ -123,7 +123,36 @@ function getLastOpenPath() {
   return null;
 }
 
+function getLastBrowsePath() {
+  const rootDir = path.resolve(__dirname, '..', '..');
+  const metaPath = path.join(rootDir, '.app', 'analysis-meta.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      return meta.last_browse_path || null;
+    } catch (e) {}
+  }
+  return null;
+}
+
 function setPortfolioDir(dirPath) {
+  const rootDir = path.resolve(__dirname, '..', '..');
+  const appDir = path.join(rootDir, '.app');
+  if (!fs.existsSync(appDir)) {
+    fs.mkdirSync(appDir, { recursive: true });
+  }
+  const metaPath = path.join(appDir, 'analysis-meta.json');
+  let meta = {};
+  if (fs.existsSync(metaPath)) {
+    try {
+      meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (e) {}
+  }
+  meta.last_browse_path = dirPath;
+  try {
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 4), 'utf8');
+  } catch (e) {}
+
   const portfolioPath = path.join(dirPath, 'portfolio.json');
   if (!fs.existsSync(portfolioPath)) {
     return { success: false, error: `portfolio.json not found at path: ${portfolioPath}` };
@@ -148,18 +177,6 @@ function setPortfolioDir(dirPath) {
   }
   currentPortfolioDir = dirPath;
 
-  const rootDir = path.resolve(__dirname, '..', '..');
-  const appDir = path.join(rootDir, '.app');
-  if (!fs.existsSync(appDir)) {
-    fs.mkdirSync(appDir, { recursive: true });
-  }
-  const metaPath = path.join(appDir, 'analysis-meta.json');
-  let meta = {};
-  if (fs.existsSync(metaPath)) {
-    try {
-      meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-    } catch (e) {}
-  }
   meta.last_open_path = dirPath;
   try {
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 4), 'utf8');
@@ -353,6 +370,7 @@ module.exports = {
   setPortfolioDir,
   resetPortfolio,
   getLastOpenPath,
+  getLastBrowsePath,
   parseDateTimestamp,
   compareDbDates,
   isRecordComplete,

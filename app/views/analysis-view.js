@@ -1,22 +1,10 @@
+import { showError } from '../components/modal.js';
+
 let hasInitializedStartup = false;
 let hasPortfolio = false;
 let taskEventsBound = false;
 
-function showPopup(msg, title = 'Error') {
-  const titleEl = document.getElementById('popup-title');
-  if (titleEl) titleEl.textContent = title;
-  document.getElementById('popup-message').textContent = msg;
-  document.getElementById('popup-modal').style.display = 'flex';
-}
-
 function initAnalysisView() {
-  const okBtn = document.getElementById('popup-ok-btn');
-  if (okBtn && !okBtn.dataset.bound) {
-    okBtn.dataset.bound = 'true';
-    okBtn.addEventListener('click', () => {
-      document.getElementById('popup-modal').style.display = 'none';
-    });
-  }
   const openBtn = document.getElementById('open-portfolio-btn');
   if (openBtn && !openBtn.dataset.bound) {
     openBtn.dataset.bound = 'true';
@@ -25,7 +13,7 @@ function initAnalysisView() {
       if (!dirPath) return;
       const res = await window.api.setPortfolioDir(dirPath);
       if (!res.success) {
-        showPopup(res.error);
+        showError(res.error);
         await window.api.resetPortfolio();
         loadAnalysis();
       } else {
@@ -40,7 +28,7 @@ function initAnalysisView() {
       updateBtn.disabled = true;
       try {
         const res = await window.api.startPortfolioUpdate();
-        if (!res.success) showPopup(res.error);
+        if (!res.success) showError(res.error);
       } finally {
         syncUpdateButton();
       }
@@ -74,7 +62,7 @@ async function checkStartupPortfolio() {
     if (lastPath) {
       const res = await window.api.setPortfolioDir(lastPath);
       if (!res.success) {
-        showPopup(res.error);
+        showError(res.error);
         await window.api.resetPortfolio();
       }
     }

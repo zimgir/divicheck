@@ -1,5 +1,6 @@
 import './components/divi-table.js';
-import { initTaskBar } from './task-bar.js';
+import { initTaskBar } from './components/task-bar.js';
+import { showError } from './components/modal.js';
 import { loadAnalysis } from './views/analysis-view.js';
 import { loadData } from './views/search-view.js';
 
@@ -42,6 +43,9 @@ window.onload = async () => {
     await new Promise(r => setTimeout(r, 50));
   }
   await initTaskBar();
+  window.api.onDbTaskFinished((state) => {
+    if (state.error) showError(state.error, 'Update failed');
+  });
   await updateDbBanner();
   loadAnalysis();
 };

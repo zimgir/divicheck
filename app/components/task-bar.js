@@ -7,14 +7,8 @@ export async function initTaskBar() {
 
   stopBtn.addEventListener('click', () => window.api.stopPortfolioUpdate());
 
-  let hideTimer = null;
-  const show = (state, finished = false) => {
-    const visible = state.running || finished;
-    if (hideTimer) {
-      clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-    if (!visible) {
+  const show = (state) => {
+    if (!state.running) {
       bar.classList.add('hidden');
       return;
     }
@@ -25,18 +19,16 @@ export async function initTaskBar() {
     if (state.msg) parts.push(state.msg);
     if (state.cur != null && state.total != null) parts.push(`${state.cur} / ${state.total}`);
     parts.push(`${state.percent || 0}%`);
-    textEl.textContent = state.error && !state.running ? `Error: ${state.error}` : parts.join(' - ');
+    textEl.textContent = parts.join(' - ');
   };
 
   const initial = await window.api.getDbTaskState();
-  show(initial, initial.running);
+  show(initial);
 
-  window.api.onDbTaskUpdate((state) => show(state, false));
+  window.api.onDbTaskUpdate((state) => show(state));
   window.api.onDbTaskFinished(async (state) => {
-    show(state, state.running || !!state.error);
+    show(state);
     await refreshActiveView();
-    if (state.running || state.error) return;
-    hideTimer = setTimeout(() => bar.classList.add('hidden'), 2500);
   });
 }
 
@@ -44,10 +36,10 @@ async function refreshActiveView() {
   const active = document.querySelector('.view-content.active');
   if (!active) return;
   if (active.id === 'view-analysis') {
-    const { loadAnalysis } = await import('./views/analysis-view.js');
+    const { loadAnalysis } = await import('../views/analysis-view.js');
     await loadAnalysis();
   } else if (active.id === 'view-search') {
-    const { loadData } = await import('./views/search-view.js');
+    const { loadData } = await import('../views/search-view.js');
     await loadData();
   }
 }

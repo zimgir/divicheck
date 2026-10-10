@@ -19,6 +19,7 @@ function appPaths() {
     root,
     symbols: path.join(root, '.app', 'symbols_portfolio.txt'),
     progress: path.join(root, '.app', 'update-progress.json'),
+    log: path.join(root, '.logs', 'app-analysis-update.log'),
     db: path.join(root, '.db', 'divicheck.db'),
     cli: path.join(root, 'db', 'db_cli.py')
   };
@@ -26,8 +27,27 @@ function appPaths() {
 
 function pythonPath() {
   if (process.env.DIVICHECK_PYTHON) return process.env.DIVICHECK_PYTHON;
-  const venv = path.join(rootDir(), '.venv', 'bin', 'python');
-  return fs.existsSync(venv) ? venv : 'python3';
+  const win = process.platform === 'win32';
+  const exe = path.join(rootDir(), '.venv', win ? 'Scripts' : 'bin', win ? 'python.exe' : 'python');
+  return fs.existsSync(exe) ? exe : null;
+}
+
+function missingVenvError() {
+  const win = process.platform === 'win32';
+  const pip = win ? '.venv\\Scripts\\pip' : '.venv/bin/pip';
+  return [
+    'Python environment not found at .venv',
+    '',
+    'Set it up:',
+    '  python3 -m venv .venv',
+    `  ${pip} install -r requirements.txt`,
+    '',
+    'Or set DIVICHECK_PYTHON to a python interpreter.'
+  ].join('\n');
+}
+
+function lastLines(text, n) {
+  return text.trim().split('\n').filter(Boolean).slice(-n).join('\n');
 }
 
 function broadcast(channel, payload) {
@@ -73,6 +93,11 @@ async function start({ title = 'Portfolio update' } = {}) {
     return { success: false, error: 'A database task is already running.' };
   }
 
+  const py = pythonPath();
+  if (!py) {
+    return { success: false, error: missingVenvError() };
+  }
+
   const paths = appPaths();
 
   const snap = await writeLastUpdateSnapshot();
@@ -85,6 +110,7 @@ async function start({ title = 'Portfolio update' } = {}) {
 
   try {
     await fsPromises.mkdir(path.dirname(paths.symbols), { recursive: true });
+    await fsPromises.mkdir(path.dirname(paths.log), { recursive: true });
     await fsPromises.writeFile(paths.symbols, symbols.join('\n') + '\n', 'utf8');
     await fsPromises.rm(paths.progress, { force: true });
   } catch (e) {
@@ -99,11 +125,13 @@ async function start({ title = 'Portfolio update' } = {}) {
     'update'
   ];
 
-  const child = spawn(pythonPath(), args, { cwd: paths.root });
+  const logStream = fs.createWriteStream(paths.log, { flags: 'w' });
+  const child = spawn(py, args, { cwd: paths.root });
   task = {
     running: true,
     title,
     child,
+    logStream,
     progress: { percent: 0, cur: null, total: null, msg: '' },
     output: '',
     exitCode: null,
@@ -116,8 +144,14 @@ async function start({ title = 'Portfolio update' } = {}) {
   const appendOutput = (buf) => {
     task.output = (task.output + buf.toString()).slice(-4000);
   };
-  child.stdout.on('data', appendOutput);
-  child.stderr.on('data', appendOutput);
+  child.stdout.on('data', (buf) => {
+    appendOutput(buf);
+    logStream.write(buf);
+  });
+  child.stderr.on('data', (buf) => {
+    appendOutput(buf);
+    logStream.write(buf);
+  });
 
   task.timer = setInterval(() => {
     const p = readProgress(paths.progress);
@@ -148,9 +182,13 @@ function finish(code) {
   if (finalProgress) task.progress = finalProgress;
   task.running = false;
   task.exitCode = code;
+  if (task.logStream) {
+    task.logStream.end();
+    task.logStream = null;
+  }
   if (code !== 0 && !task.stopped && !task.error) {
-    const tail = task.output.trim().split('\n').filter(Boolean).slice(-1)[0] || '';
-    task.error = `Exited with code ${code}${tail ? ': ' + tail : ''}`;
+    const tail = lastLines(task.output, 10);
+    task.error = `Update failed (exit code ${code}).\n\n${tail}\n\nSee full log: ${appPaths().log}`;
   }
   broadcast('db-task-update', getState());
   broadcast('db-task-finished', getState());

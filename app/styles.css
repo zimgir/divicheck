@@ -242,3 +242,28 @@ tr:hover {
   flex-direction: column;
   gap: 15px;
 }
+.diff {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.diff-up {
+  color: #10b981;
+}
+.diff-down {
+  color: #ef4444;
+}
+.diff-flat {
+  color: #ffffff;
+}
+.badge-new {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid #10b981;
+  border-radius: 3px;
+  vertical-align: middle;
+}

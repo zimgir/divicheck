@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { parseDateTimestamp, compareDbDates, getFormattedDate } = require('../utils/date-utils');
-const { isRecordComplete, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath, writeLastUpdateSnapshot } = require('../services/portfolio-service');
+const { isRecordComplete, isSnapshotComplete, computeDelta, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath, writeLastUpdateSnapshot } = require('../services/portfolio-service');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -24,6 +24,25 @@ test('isRecordComplete validates required fields', () => {
 
   assert.strictEqual(isRecordComplete(null), false);
   assert.strictEqual(isRecordComplete({}), false);
+});
+
+test('isSnapshotComplete requires date and symbols array', () => {
+  assert.strictEqual(isSnapshotComplete({ date: '2026-01-01', symbols: ['AAPL'] }), true);
+  assert.strictEqual(isSnapshotComplete({ date: '2026-01-01', symbols: [] }), true);
+  assert.strictEqual(isSnapshotComplete({ date: '2026-01-01' }), false);
+  assert.strictEqual(isSnapshotComplete({ symbols: ['AAPL'] }), false);
+  assert.strictEqual(isSnapshotComplete(null), false);
+});
+
+test('computeDelta returns abs and pct', () => {
+  assert.deepStrictEqual(computeDelta(110, 100), { abs: 10, pct: 10 });
+  assert.deepStrictEqual(computeDelta(90, 100), { abs: -10, pct: -10 });
+  assert.deepStrictEqual(computeDelta(100, 100), { abs: 0, pct: 0 });
+});
+
+test('computeDelta treats zero base as null pct', () => {
+  assert.deepStrictEqual(computeDelta(5, 0), { abs: 5, pct: null });
+  assert.deepStrictEqual(computeDelta(0, 0), { abs: 0, pct: null });
 });
 
 test('getFormattedDate returns formatted string', () => {
@@ -110,6 +129,10 @@ test('writeLastUpdateSnapshot writes per-symbol last_update records', async () =
   assert.ok(meta.records.AAPL.last_update.date);
   assert.ok(meta.records.MSFT.last_update);
   assert.strictEqual(meta.records.MSFT.last_update.shares, 5);
+
+  assert.ok(meta.snapshots.last_update);
+  assert.ok(meta.snapshots.last_update.date);
+  assert.deepStrictEqual(meta.snapshots.last_update.symbols.sort(), ['AAPL', 'MSFT']);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

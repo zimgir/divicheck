@@ -17,6 +17,40 @@ function isRecordComplete(rec) {
   return true;
 }
 
+function isSnapshotComplete(snap) {
+  return !!(snap && typeof snap === 'object' && snap.date && Array.isArray(snap.symbols));
+}
+
+function symbolsFromRecords(parsedMeta, key) {
+  const records = (parsedMeta && parsedMeta.records) || {};
+  return Object.keys(records).filter(sym => isRecordComplete(records[sym] && records[sym][key]));
+}
+
+function computeDelta(cur, base) {
+  const c = Number(cur) || 0;
+  const b = Number(base) || 0;
+  return {
+    abs: Number((c - b).toFixed(2)),
+    pct: b !== 0 ? Number((((c - b) / b) * 100).toFixed(2)) : null
+  };
+}
+
+function aggregateBaseline(parsedMeta, key) {
+  const snap = (parsedMeta.snapshots && parsedMeta.snapshots[key]) || {};
+  const symbols = Array.isArray(snap.symbols) ? snap.symbols : [];
+  const records = parsedMeta.records || {};
+  let count = 0, value = 0, yearly = 0;
+  for (const sym of symbols) {
+    const rec = records[sym] && records[sym][key];
+    if (!isRecordComplete(rec)) continue;
+    const shares = Number(rec.shares) || 0;
+    value += shares * (Number(rec.price) || 0);
+    yearly += shares * (Number(rec.yearly_dividend) || 0);
+    count += 1;
+  }
+  return { count, value, yearly };
+}
+
 function getRootDir() {
   return path.resolve(__dirname, '..', '..');
 }
@@ -203,6 +237,20 @@ async function getPortfolioStats() {
     }
   }
 
+  parsedMeta.snapshots = parsedMeta.snapshots || {};
+  if (!isSnapshotComplete(parsedMeta.snapshots.init)) {
+    parsedMeta.snapshots.init = { date: getFormattedDate(), symbols: symbolsFromRecords(parsedMeta, 'init') };
+    portfolioUpdated = true;
+  }
+  if (!isSnapshotComplete(parsedMeta.snapshots.last_update)) {
+    parsedMeta.snapshots.last_update = { date: getFormattedDate(), symbols: symbolsFromRecords(parsedMeta, 'last_update') };
+    portfolioUpdated = true;
+  }
+  const baselineSymbols = {
+    init: new Set((parsedMeta.snapshots.init.symbols || []).map(s => String(s).toUpperCase())),
+    last_update: new Set((parsedMeta.snapshots.last_update.symbols || []).map(s => String(s).toUpperCase()))
+  };
+
   if (portfolioUpdated && metaPath) {
     try {
       await fs.writeFile(metaPath, JSON.stringify(parsedMeta, null, 4), 'utf8');
@@ -227,6 +275,28 @@ async function getPortfolioStats() {
     totalHoldingsValue += holdingValue;
     totalYearlyDividend += yearlyDividend;
 
+    const symKey = (symbol || '').toUpperCase();
+    const diff = {};
+    const status = {};
+    for (const key of ['init', 'last_update']) {
+      const rec = (parsedMeta.records[symKey] && parsedMeta.records[symKey][key]) || null;
+      const isNew = !baselineSymbols[key].has(symKey);
+      status[key] = isNew ? 'new' : 'shared';
+      if (rec && !isNew) {
+        const baseShares = Number(rec.shares) || 0;
+        const basePrice = Number(rec.price) || 0;
+        diff[key] = {
+          shares: computeDelta(shares, baseShares),
+          price: computeDelta(price, basePrice),
+          holding_value: computeDelta(holdingValue, baseShares * basePrice),
+          yearly_dividend: computeDelta(yearlyDividend, baseShares * (Number(rec.yearly_dividend) || 0)),
+          yield: computeDelta(yield1y, Number(rec.yield) || 0)
+        };
+      } else {
+        diff[key] = null;
+      }
+    }
+
     detailedHoldings.push({
       symbol,
       company: stock.COMPANY || symbol,
@@ -237,7 +307,9 @@ async function getPortfolioStats() {
       yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
       yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
       updated_at: stock.UPDATED_AT || 'N/A',
-      db_filtered: !!(parsedMeta.flags && parsedMeta.flags[symbol] && parsedMeta.flags[symbol].db_filtered)
+      db_filtered: !!(parsedMeta.flags && parsedMeta.flags[symbol] && parsedMeta.flags[symbol].db_filtered),
+      status,
+      diff
     });
   }
 
@@ -253,6 +325,19 @@ async function getPortfolioStats() {
   const averageDividendYield = totalHoldingsValue > 0 ? (totalYearlyDividend / totalHoldingsValue) * 100 : 0;
   const expectedMonthlyDividend = totalYearlyDividend / 12;
 
+  const summaryDiff = {};
+  for (const key of ['init', 'last_update']) {
+    const base = aggregateBaseline(parsedMeta, key);
+    const baseAvgYield = base.value > 0 ? (base.yearly / base.value) * 100 : 0;
+    summaryDiff[key] = {
+      holdings_count: computeDelta(detailedHoldings.length, base.count),
+      total_holdings_value: computeDelta(totalHoldingsValue, base.value),
+      average_dividend_yield: computeDelta(averageDividendYield, baseAvgYield),
+      expected_total_yearly_dividend: computeDelta(totalYearlyDividend, base.yearly),
+      expected_monthly_dividend: computeDelta(expectedMonthlyDividend, base.yearly / 12)
+    };
+  }
+
   return {
     portfolio_name: portfolioName,
     portfolio_path: currentPortfolioDir ? currentPortfolioDir : 'N/A',
@@ -261,6 +346,7 @@ async function getPortfolioStats() {
     expected_total_yearly_dividend: totalYearlyDividend.toFixed(2),
     expected_monthly_dividend: expectedMonthlyDividend.toFixed(2),
     holdings: detailedHoldings,
+    summary_diff: summaryDiff,
     sectors: {
       labels: sectorLabels,
       values: sectorValues
@@ -295,13 +381,17 @@ async function writeLastUpdateSnapshot() {
   } catch (e) {}
   meta.records = meta.records || {};
   meta.flags = meta.flags || {};
+  meta.snapshots = meta.snapshots || {};
 
+  const snapshotSymbols = [];
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
     const shares = Number(h.n) || 0;
     meta.records[sym] = meta.records[sym] || {};
     meta.records[sym].last_update = buildRecordData(dbRows[sym] || {}, shares);
+    snapshotSymbols.push(sym);
   }
+  meta.snapshots.last_update = { date: getFormattedDate(), symbols: snapshotSymbols };
 
   try {
     await fs.writeFile(metaPath, JSON.stringify(meta, null, 4), 'utf8');
@@ -332,5 +422,7 @@ module.exports = {
   getPortfolioStats,
   getPortfolioSymbols,
   writeLastUpdateSnapshot,
-  isRecordComplete
+  isRecordComplete,
+  isSnapshotComplete,
+  computeDelta
 };

@@ -81,75 +81,124 @@ async function checkStartupPortfolio() {
   } catch (e) {}
 }
 
-export async function loadAnalysis() {
-  await checkStartupPortfolio();
-  try {
-    const stats = await window.api.getPortfolioStats();
-    hasPortfolio = true;
+let lastStats = null;
+let currentBaseline = 'last_update';
 
-    document.getElementById('analysis-summary').innerHTML = `
-      <table>
-        <tr><td><strong>Portfolio Name:</strong></td><td>${stats.portfolio_name}</td></tr>
-        <tr><td><strong>Number of Holdings:</strong></td><td>${stats.holdings.length}</td></tr>
-        <tr><td><strong>Total Holdings Value:</strong></td><td>$${stats.total_holdings_value}</td></tr>
-        <tr><td><strong>Average Dividend Yield:</strong></td><td>${stats.average_dividend_yield}%</td></tr>
-        <tr><td><strong>Expected Total Yearly Dividend:</strong></td><td>$${stats.expected_total_yearly_dividend}</td></tr>
-        <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}</td></tr>
-        <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
-      </table>
-      <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
-        <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
-        <button id="update-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Update</button>
-      </div>
+function formatDiff(delta) {
+  if (!delta) return '';
+  const abs = Number(delta.abs) || 0;
+  const pct = delta.pct;
+  let cls = 'diff-flat';
+  if (abs > 0) cls = 'diff-up';
+  else if (abs < 0) cls = 'diff-down';
+  let text;
+  if (abs === 0) {
+    text = '+0.00 (0.00%)';
+  } else {
+    const sign = abs > 0 ? '+' : '-';
+    const p = (pct === null || pct === undefined) ? '' : ` (${sign}${Math.abs(pct).toFixed(2)}%)`;
+    text = `${sign}${Math.abs(abs).toFixed(2)}${p}`;
+  }
+  return `<div><span class="diff ${cls}">${text}</span></div>`;
+}
+
+function cellDiff(holding, baseline, metric) {
+  if (holding.status && holding.status[baseline] === 'new') {
+    return '<div><span class="diff diff-up">\u2014</span></div>';
+  }
+  const d = holding.diff && holding.diff[baseline];
+  return formatDiff(d ? d[metric] : null);
+}
+
+function diffSelectorHtml() {
+  const opt = (val, label) =>
+    `<option value="${val}" ${currentBaseline === val ? 'selected' : ''}>${label}</option>`;
+  return `
+    <label for="diff-baseline" style="font-size: 13px; color: #cccccc; margin-left: auto;">Compare to:</label>
+    <select id="diff-baseline" style="padding: 4px 8px; font-size: 13px; background: #3c3c3c; color: #ffffff; border: 1px solid #555555; border-radius: 3px; cursor: pointer;">
+      ${opt('last_update', 'Last Update')}
+      ${opt('init', 'Init')}
+    </select>`;
+}
+
+function renderAnalysis(stats) {
+  const sd = (stats.summary_diff && stats.summary_diff[currentBaseline]) || {};
+
+  document.getElementById('analysis-summary').innerHTML = `
+    <table>
+      <tr><td><strong>Portfolio Name:</strong></td><td>${stats.portfolio_name}</td></tr>
+      <tr><td><strong>Number of Holdings:</strong></td><td>${stats.holdings.length}${formatDiff(sd.holdings_count)}</td></tr>
+      <tr><td><strong>Total Holdings Value:</strong></td><td>$${stats.total_holdings_value}${formatDiff(sd.total_holdings_value)}</td></tr>
+      <tr><td><strong>Average Dividend Yield:</strong></td><td>${stats.average_dividend_yield}%${formatDiff(sd.average_dividend_yield)}</td></tr>
+      <tr><td><strong>Expected Total Yearly Dividend:</strong></td><td>$${stats.expected_total_yearly_dividend}${formatDiff(sd.expected_total_yearly_dividend)}</td></tr>
+      <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}${formatDiff(sd.expected_monthly_dividend)}</td></tr>
+      <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
+    </table>
+    <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+      <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+      <button id="update-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Update</button>
+      ${diffSelectorHtml()}
+    </div>
+  `;
+  initAnalysisView();
+  syncUpdateButton();
+
+  const baselineSel = document.getElementById('diff-baseline');
+  if (baselineSel) {
+    baselineSel.addEventListener('change', () => {
+      currentBaseline = baselineSel.value;
+      if (lastStats) renderAnalysis(lastStats);
+    });
+  }
+
+  const theadTr = document.getElementById('analysis-header');
+  if (theadTr) {
+    theadTr.innerHTML = `
+      <th>Symbol</th>
+      <th>Company</th>
+      <th>Shares</th>
+      <th>Price ($)</th>
+      <th>Holding Value ($)</th>
+      <th>Yearly Dividend ($)</th>
+      <th>Yield (%)</th>
+      <th>Last Updated</th>
     `;
-    initAnalysisView();
-    syncUpdateButton();
+  }
 
-    const theadTr = document.getElementById('analysis-header');
-    if (theadTr) {
-      theadTr.innerHTML = `
-        <th>Symbol</th>
-        <th>Company</th>
-        <th>Shares</th>
-        <th>Price ($)</th>
-        <th>Holding Value ($)</th>
-        <th>Yearly Dividend ($)</th>
-        <th>Yield (%)</th>
-        <th>Last Updated</th>
-      `;
-    }
+  const tbody = document.getElementById('analysis-body');
+  const noDataMsg = document.getElementById('pie-no-data-msg');
 
-    const tbody = document.getElementById('analysis-body');
-    const noDataMsg = document.getElementById('pie-no-data-msg');
+  if (window.sectorChartInstance) {
+    window.sectorChartInstance.destroy();
+    window.sectorChartInstance = null;
+  }
 
-    if (window.sectorChartInstance) {
-      window.sectorChartInstance.destroy();
-      window.sectorChartInstance = null;
-    }
+  if (!stats.holdings || stats.holdings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8">No data</td></tr>';
+    if (noDataMsg) noDataMsg.style.display = 'flex';
+    document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
+    return;
+  }
 
-    if (!stats.holdings || stats.holdings.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8">No data</td></tr>';
-      if (noDataMsg) noDataMsg.style.display = 'flex';
-      document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
-      return;
-    }
+  if (noDataMsg) noDataMsg.style.display = 'none';
 
-    if (noDataMsg) noDataMsg.style.display = 'none';
-
-    tbody.innerHTML = stats.holdings.map(h => `
+  tbody.innerHTML = stats.holdings.map(h => {
+    const badge = (h.status && h.status[currentBaseline] === 'new') ? ' <span class="badge-new">new</span>' : '';
+    return `
       <tr ${h.db_filtered ? 'data-legend-index="0"' : ''}>
-        <td ${h.db_filtered ? 'style="color: #facc15;"' : ''}>${h.symbol}</td>
+        <td ${h.db_filtered ? 'style="color: #facc15;"' : ''}>${h.symbol}${badge}</td>
         <td>${h.company}</td>
-        <td>${h.shares}</td>
-        <td>$${h.price}</td>
-        <td>$${h.holding_value}</td>
-        <td>$${h.yearly_dividend}</td>
-        <td>${h.yield_1y}%</td>
+        <td>${h.shares}${cellDiff(h, currentBaseline, 'shares')}</td>
+        <td>$${h.price}${cellDiff(h, currentBaseline, 'price')}</td>
+        <td>$${h.holding_value}${cellDiff(h, currentBaseline, 'holding_value')}</td>
+        <td>$${h.yearly_dividend}${cellDiff(h, currentBaseline, 'yearly_dividend')}</td>
+        <td>${h.yield_1y}%${cellDiff(h, currentBaseline, 'yield')}</td>
         <td>${h.updated_at}</td>
       </tr>
-    `).join('');
+    `;
+  }).join('');
 
-    const ctx = document.getElementById('sectorPieChart').getContext('2d');
+  const ctx = document.getElementById('sectorPieChart').getContext('2d');
     const sectorColors = [
       '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
       '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#84cc16',
@@ -198,8 +247,19 @@ export async function loadAnalysis() {
       }
     });
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
+}
+
+export async function loadAnalysis() {
+  await checkStartupPortfolio();
+  try {
+    const stats = await window.api.getPortfolioStats();
+    hasPortfolio = true;
+    lastStats = stats;
+    currentBaseline = 'last_update';
+    renderAnalysis(stats);
   } catch (err) {
     hasPortfolio = false;
+    lastStats = null;
     document.getElementById('analysis-summary').innerHTML = `
       <span style="color: red;">Error: ${err.message}</span>
       <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">

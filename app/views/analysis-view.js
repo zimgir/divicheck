@@ -1,3 +1,7 @@
+let hasInitializedStartup = false;
+let hasPortfolio = false;
+let taskEventsBound = false;
+
 function showPopup(msg, title = 'Error') {
   const titleEl = document.getElementById('popup-title');
   if (titleEl) titleEl.textContent = title;
@@ -29,6 +33,31 @@ function initAnalysisView() {
       }
     });
   }
+  const updateBtn = document.getElementById('update-portfolio-btn');
+  if (updateBtn && !updateBtn.dataset.bound) {
+    updateBtn.dataset.bound = 'true';
+    updateBtn.addEventListener('click', async () => {
+      updateBtn.disabled = true;
+      try {
+        const res = await window.api.startPortfolioUpdate();
+        if (!res.success) showPopup(res.error);
+      } finally {
+        syncUpdateButton();
+      }
+    });
+  }
+  if (!taskEventsBound) {
+    taskEventsBound = true;
+    window.api.onDbTaskUpdate(() => syncUpdateButton());
+    window.api.onDbTaskFinished(() => syncUpdateButton());
+  }
+}
+
+async function syncUpdateButton() {
+  const btn = document.getElementById('update-portfolio-btn');
+  if (!btn) return;
+  const state = await window.api.getDbTaskState();
+  btn.disabled = !hasPortfolio || state.running;
 }
 
 if (document.readyState === 'loading') {
@@ -36,8 +65,6 @@ if (document.readyState === 'loading') {
 } else {
   initAnalysisView();
 }
-
-let hasInitializedStartup = false;
 
 async function checkStartupPortfolio() {
   if (hasInitializedStartup) return;
@@ -58,6 +85,7 @@ export async function loadAnalysis() {
   await checkStartupPortfolio();
   try {
     const stats = await window.api.getPortfolioStats();
+    hasPortfolio = true;
 
     document.getElementById('analysis-summary').innerHTML = `
       <table>
@@ -69,11 +97,13 @@ export async function loadAnalysis() {
         <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}</td></tr>
         <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
       </table>
-      <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+      <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
         <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+        <button id="update-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Update</button>
       </div>
     `;
     initAnalysisView();
+    syncUpdateButton();
 
     const theadTr = document.getElementById('analysis-header');
     if (theadTr) {
@@ -169,13 +199,16 @@ export async function loadAnalysis() {
     });
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
   } catch (err) {
+    hasPortfolio = false;
     document.getElementById('analysis-summary').innerHTML = `
       <span style="color: red;">Error: ${err.message}</span>
-      <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+      <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
         <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+        <button id="update-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Update</button>
       </div>
     `;
     initAnalysisView();
+    syncUpdateButton();
     document.getElementById('analysis-body').innerHTML = `<tr><td colspan="8" style="color: red;">Failed to load portfolio analysis</td></tr>`;
     const noDataMsg = document.getElementById('pie-no-data-msg');
     if (noDataMsg) noDataMsg.style.display = 'flex';

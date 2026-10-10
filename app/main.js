@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { getStats } = require('./services/db-service');
 const { getPortfolioStats, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath, getPortfolioSymbols } = require('./services/portfolio-service');
+const updateService = require('./services/update-service');
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -34,6 +35,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  updateService.stop();
 });
 
 ipcMain.handle('get-stats', async () => {
@@ -70,4 +75,16 @@ ipcMain.handle('reset-portfolio', async () => {
 
 ipcMain.handle('get-last-open-path', async () => {
   return getLastOpenPath();
+});
+
+ipcMain.handle('start-portfolio-update', async () => {
+  return updateService.start();
+});
+
+ipcMain.handle('stop-portfolio-update', async () => {
+  return updateService.stop();
+});
+
+ipcMain.handle('get-db-task-state', async () => {
+  return updateService.getState();
 });

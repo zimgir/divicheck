@@ -26,8 +26,9 @@
     <div id="sticky-analysis-panel" class="analysis-top-panel">
       <div class="stats-card" id="analysis-summary">
         <span class="loading">Loading analysis...</span>
-        <div style="display: flex; align-items: center; justify-content: flex-start; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
+        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
           <button id="open-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Open</button>
+          <button id="update-portfolio-btn" class="tab-btn" style="padding: 6px 14px; font-size: 13px; background: #0e639c; color: white; cursor: pointer;">Update</button>
         </div>
       </div>
       <div class="stats-card" style="display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; position: relative;">
@@ -40,6 +41,15 @@
     </div>
 
     <divi-table id-prefix="analysis" legend="Filtered by stable dividend filter"></divi-table>
+  </div>
+
+  <div id="db-task-bar" class="db-task-bar hidden">
+    <div class="db-task-title" id="db-task-title">Portfolio update</div>
+    <div class="db-task-progress">
+      <div class="db-task-fill" id="db-task-fill"></div>
+    </div>
+    <div class="db-task-text" id="db-task-text"></div>
+    <button id="db-task-stop-btn" class="tab-btn" style="padding: 4px 12px; font-size: 12px; background: #a4262c; color: white; border: none; cursor: pointer;">Stop</button>
   </div>
 
   <div id="popup-modal" class="modal" style="display: none;">

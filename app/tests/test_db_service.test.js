@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { parseDateTimestamp, compareDbDates, getFormattedDate } = require('../utils/date-utils');
-const { isRecordComplete, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath } = require('../services/portfolio-service');
+const { isRecordComplete, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath, writeLastUpdateSnapshot } = require('../services/portfolio-service');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -89,6 +89,27 @@ test('setPortfolioDir validates holdings field and structure', async () => {
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test', holdings: [{ s: 'AAPL', n: 10 }] }));
   res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, true);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
+
+test('writeLastUpdateSnapshot writes per-symbol last_update records', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'divicheck-test-'));
+  fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({
+    name: 'Test', holdings: [{ s: 'AAPL', n: 10 }, { s: 'MSFT', n: 5 }]
+  }));
+  const res = await setPortfolioDir(tmpDir);
+  assert.strictEqual(res.success, true);
+
+  const snap = await writeLastUpdateSnapshot();
+  assert.strictEqual(snap.success, true);
+
+  const meta = JSON.parse(fs.readFileSync(path.join(tmpDir, 'portfolio-meta.json'), 'utf8'));
+  assert.ok(meta.records.AAPL.last_update);
+  assert.strictEqual(meta.records.AAPL.last_update.shares, 10);
+  assert.ok(meta.records.AAPL.last_update.date);
+  assert.ok(meta.records.MSFT.last_update);
+  assert.strictEqual(meta.records.MSFT.last_update.shares, 5);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

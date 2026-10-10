@@ -176,6 +176,48 @@ tr:hover {
   min-width: 320px;
   margin-bottom: 0;
 }
+.db-task-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #252526;
+  border-top: 1px solid #333333;
+  padding: 10px 16px;
+  box-sizing: border-box;
+}
+.db-task-bar.hidden {
+  display: none;
+}
+.db-task-title {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.db-task-progress {
+  flex: 1;
+  height: 14px;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.db-task-fill {
+  height: 100%;
+  width: 0;
+  background: #0e639c;
+  transition: width 0.3s ease;
+}
+.db-task-text {
+  color: #cccccc;
+  font-size: 12px;
+  white-space: nowrap;
+}
 .modal {
   position: fixed;
   z-index: 1000;

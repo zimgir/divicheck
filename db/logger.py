@@ -1,10 +1,14 @@
 import sys
+import json
 import logging
 import contextlib
+from pathlib import Path
 from db import LOGS_DIR
 
 
 class DBLogger:
+    progress_path = None
+
     @staticmethod
     def get_logger(name: str, reset: bool = True):
         log_file = LOGS_DIR / f"{name}.log"
@@ -24,8 +28,20 @@ class DBLogger:
 
 
     @staticmethod
-    def print_progress(current: int, total: int):
-        print(f"Progress: {current}/{total} ({current / total:.2%})")
+    def print_progress(current: int, total: int, msg: str = ""):
+        print(f"Progress: {current}/{total} ({current / total:.2%}) {msg}".rstrip())
+        if DBLogger.progress_path is None:
+            return
+        percent = round(current / total * 100, 1) if total else 0
+        path = Path(DBLogger.progress_path)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        payload = {"percent": percent, "cur": current, "total": total, "msg": msg}
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(payload))
+            tmp.replace(path)
+        except OSError:
+            pass
 
 
 class LoggerStream:

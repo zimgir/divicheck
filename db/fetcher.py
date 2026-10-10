@@ -71,7 +71,7 @@ class DBDataFetcher:
                                 raise
                             except Exception as e:
                                 logger.error(f"{sym} inner consecutive filter fail: {e}")
-                        DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols))
+                        DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols), "Filtering dividend symbols")
                     except KeyboardInterrupt:
                         raise
                     except Exception as e:
@@ -95,24 +95,26 @@ class DBDataFetcher:
             if output_csv.exists():
                 output_csv.unlink()
 
+            total = len(symbols)
             total_fetched = 0
-            for i in range(0, len(symbols), batch_size):
+            DBLogger.print_progress(0, total, "Fetching rows")
+            for i in range(0, total, batch_size):
                 batch = symbols[i : i + batch_size]
 
                 rows = []
-                for sym in batch:
+                for j, sym in enumerate(batch):
                     raw_data = self._fetch_raw_data(sym)
                     if raw_data:
                         calc = DBRowCalculator(sym, raw_data)
                         rows.append(calc.calculate())
+                    DBLogger.print_progress(min(i + j + 1, total), total, f"Fetching {sym}")
                 if rows:
                     df = pd.DataFrame(rows)
                     df.to_csv(output_csv, mode='a', index=False, header=first)
                     first = False
                     total_fetched += len(rows)
 
-                DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols))
-                if sleep and (i + batch_size < len(symbols)):
+                if sleep and (i + batch_size < total):
                     time.sleep(sleep)
 
             print(f"Done fetching {total_fetched}. Saved to {output_csv}")

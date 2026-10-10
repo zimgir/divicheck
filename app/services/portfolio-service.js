@@ -21,6 +21,21 @@ function getRootDir() {
   return path.resolve(__dirname, '..', '..');
 }
 
+function buildRecordData(stock, shares) {
+  stock = stock || {};
+  const price = Number(stock.PRICE) || 0;
+  const div1y = stock.DIV_1Y !== null && stock.DIV_1Y !== undefined ? Number(stock.DIV_1Y) : (Number(stock.CUR_DIV || 0) * Number(stock.NUM_DIV_1Y || 4));
+  const yield1y = stock.YIELD_1Y !== null && stock.YIELD_1Y !== undefined ? Number(stock.YIELD_1Y) : (price > 0 ? (div1y / price) * 100 : 0);
+  const dateStr = stock.UPDATED_AT || getFormattedDate();
+  return {
+    date: dateStr,
+    price: Number(price.toFixed(2)),
+    shares: shares,
+    yearly_dividend: Number(div1y.toFixed(2)),
+    yield: Number(yield1y.toFixed(2))
+  };
+}
+
 function getMetaPath() {
   return process.env.DIVICHECK_META_PATH || path.join(getRootDir(), '.app', 'analysis-meta.json');
 }
@@ -170,19 +185,8 @@ async function getPortfolioStats() {
     const symbolRecords = parsedMeta.records[sym];
 
     const stock = dbRows[sym] || {};
-    const price = Number(stock.PRICE) || 0;
     const shares = Number(h.n) || 0;
-    const div1y = stock.DIV_1Y !== null && stock.DIV_1Y !== undefined ? Number(stock.DIV_1Y) : (Number(stock.CUR_DIV || 0) * Number(stock.NUM_DIV_1Y || 4));
-    const yield1y = stock.YIELD_1Y !== null && stock.YIELD_1Y !== undefined ? Number(stock.YIELD_1Y) : (price > 0 ? (div1y / price) * 100 : 0);
-    const dateStr = stock.UPDATED_AT || getFormattedDate();
-
-    const recordData = {
-      date: dateStr,
-      price: Number(price.toFixed(2)),
-      shares: shares,
-      yearly_dividend: Number(div1y.toFixed(2)),
-      yield: Number(yield1y.toFixed(2))
-    };
+    const recordData = buildRecordData(stock, shares);
 
     if (!isRecordComplete(symbolRecords.init)) {
       symbolRecords.init = recordData;
@@ -264,6 +268,49 @@ async function getPortfolioStats() {
   };
 }
 
+async function writeLastUpdateSnapshot() {
+  if (!currentPortfolioDir) {
+    return { success: false, error: 'No portfolio open.' };
+  }
+  const portfolioPath = path.join(currentPortfolioDir, 'portfolio.json');
+  const metaPath = path.join(currentPortfolioDir, 'portfolio-meta.json');
+
+  let holdings = [];
+  try {
+    const parsed = JSON.parse(await fs.readFile(portfolioPath, 'utf8'));
+    holdings = parsed.holdings || [];
+  } catch (e) {
+    return { success: false, error: `Failed to read portfolio: ${e.message}` };
+  }
+
+  const dbRows = {};
+  if (holdings.length > 0) {
+    const rows = getStockRows(holdings.map(h => h.s));
+    for (const r of rows) dbRows[r.SYMBOL] = r;
+  }
+
+  let meta = { flags: {}, records: {} };
+  try {
+    meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+  } catch (e) {}
+  meta.records = meta.records || {};
+  meta.flags = meta.flags || {};
+
+  for (const h of holdings) {
+    const sym = (h.s || '').toUpperCase();
+    const shares = Number(h.n) || 0;
+    meta.records[sym] = meta.records[sym] || {};
+    meta.records[sym].last_update = buildRecordData(dbRows[sym] || {}, shares);
+  }
+
+  try {
+    await fs.writeFile(metaPath, JSON.stringify(meta, null, 4), 'utf8');
+  } catch (e) {
+    return { success: false, error: `Failed to write meta: ${e.message}` };
+  }
+  return { success: true };
+}
+
 async function getPortfolioSymbols() {
   if (!currentPortfolioDir) return [];
   const portfolioPath = path.join(currentPortfolioDir, 'portfolio.json');
@@ -284,5 +331,6 @@ module.exports = {
   resetPortfolio,
   getPortfolioStats,
   getPortfolioSymbols,
+  writeLastUpdateSnapshot,
   isRecordComplete
 };

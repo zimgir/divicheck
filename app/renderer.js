@@ -1,4 +1,5 @@
 import './components/divi-table.js';
+import { initTaskBar } from './task-bar.js';
 import { loadAnalysis } from './views/analysis-view.js';
 import { loadData } from './views/search-view.js';
 
@@ -25,5 +26,6 @@ window.onload = async () => {
   while (!window.api || !window.api.getPortfolioStats) {
     await new Promise(r => setTimeout(r, 50));
   }
+  await initTaskBar();
   loadAnalysis();
 };

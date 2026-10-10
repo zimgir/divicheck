@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from db import ALL_SYMBOLS_PATH, DIVIDEND_SYMBOLS_PATH, DEFAULT_SYMBOLS_PATH, DB_PATH, FETCH_ROWS_PATH, FALLBACK_SYMBOLS
 from db.fetcher import DBDataFetcher
 from db.db_controller import SQLDBController
+from db.logger import DBLogger
 
 
 
@@ -65,7 +66,9 @@ def cmd_update(args) -> int:
     else:
         db.init_db()
 
+    DBLogger.print_progress(0, 100, "Writing to database")
     n = db.upsert_from_csv(FETCH_ROWS_PATH)
+    DBLogger.print_progress(100, 100, "Writing to database")
 
     pruned = 0
     if args.prune:
@@ -160,6 +163,7 @@ def main(argv=None) -> int:
     parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/update).")
     parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by symbols/update).")
     parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/update).")
+    parser_main.add_argument("--progress", type=Path, default=None, help="Path to JSON progress file (used by symbols/update).")
 
     parser_sub = parser_main.add_subparsers(dest="cmd", required=True)
 
@@ -174,6 +178,8 @@ def main(argv=None) -> int:
     parser_stats.add_argument("--json", action="store_true", help="Output stats as JSON.")
 
     args = parser_main.parse_args(argv)
+
+    DBLogger.progress_path = args.progress
 
     cmds = {"symbols": cmd_symbols,
             "update": cmd_update,

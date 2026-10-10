@@ -2,6 +2,31 @@ import pytest
 import pandas as pd
 from datetime import datetime
 from db.fetcher import DBDataFetcher
+from db.tests.test_db_calculator import _get_jnj_data
+
+def test_fetch_db_rows_flushes_per_symbol(tmp_path):
+    fetcher = DBDataFetcher()
+    data = _get_jnj_data()
+    fetcher._fetch_raw_data = lambda sym: data if sym == "JNJ" else None
+    out = tmp_path / "rows.csv"
+
+    fetcher.fetch_db_rows(["JNJ", "MISSING"], out, sleep=0)
+
+    df = pd.read_csv(out)
+    assert len(df) == 1
+    assert df.iloc[0]["SYMBOL"] == "JNJ"
+    assert out.read_text().count("SYMBOL") == 1
+
+
+def test_fetch_db_rows_no_rows_creates_no_file(tmp_path):
+    fetcher = DBDataFetcher()
+    fetcher._fetch_raw_data = lambda sym: None
+    out = tmp_path / "rows.csv"
+
+    fetcher.fetch_db_rows(["A", "B"], out, sleep=0)
+
+    assert not out.exists()
+
 
 def test_filter_divident_symbols_logic():
     fetcher = DBDataFetcher()

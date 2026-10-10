@@ -1,3 +1,4 @@
+import csv
 import sys
 import time
 import pandas as pd
@@ -42,76 +43,73 @@ class DBDataFetcher:
         return True
 
 
-    def fetch_divident_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
+    def fetch_divident_symbols(self, symbols: list[str], last_n_years: int = 5, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
         print(f"Start proccessing {len(symbols)} symbols")
 
         dividend_symbols = []
+        total = len(symbols)
 
         out = Path(output_path)
         if out.exists():
             out.unlink()
+        f = None
         try:
-            for i in range(0, len(symbols), batch_size):
-                batch = symbols[i : i + batch_size]
+            for i, sym in enumerate(symbols, 1):
                 try:
-                    tickers_obj = yf.Tickers(" ".join(batch))
-                    for sym in batch:
-
-                        try:
-                            ticker = tickers_obj.tickers[sym]
-                            divs = self._retry_on_rate_limit(lambda: ticker.dividends)
-                            if self._filter_divident_symbols(divs, last_n_years=last_n_years):
-                                dividend_symbols.append(sym)
-                                with open(out, "a") as f:
-                                    f.write(sym + "\n")
-
-                        except KeyboardInterrupt:
-                            raise
-                        except Exception as e:
-                            print(f"{sym} inner consecutive filter fail: {e}", file=sys.stderr)
-                    DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols), "Filtering dividend symbols")
+                    ticker = yf.Ticker(sym)
+                    divs = self._retry_on_rate_limit(lambda: ticker.dividends)
+                    if self._filter_divident_symbols(divs, last_n_years=last_n_years):
+                        dividend_symbols.append(sym)
+                        if f is None:
+                            f = open(out, "a")
+                        f.write(sym + "\n")
+                        f.flush()
                 except KeyboardInterrupt:
                     raise
                 except Exception as e:
-                    print(f"Batch processing failed for {batch}: {e}", file=sys.stderr)
-                    time.sleep(5 * sleep)
-                    continue
-                if sleep and (i + batch_size < len(symbols)):
+                    print(f"{sym} consecutive filter fail: {e}", file=sys.stderr)
+                DBLogger.print_progress(i, total, "Filtering dividend symbols")
+                if sleep:
                     time.sleep(sleep)
         except KeyboardInterrupt:
             print("Got KeyboardInterrupt stopping...")
+        finally:
+            if f:
+                f.close()
         print(f"Done processing {len(dividend_symbols)} symbols")
         return dividend_symbols
 
 
-    def fetch_db_rows(self, symbols: list[str], output_csv: Path, batch_size: int = 40, sleep: float = 1.0) -> Path:
-        """Fetch/calculate in batches, write directly to intermediate CSV."""
+    def fetch_db_rows(self, symbols: list[str], output_csv: Path, sleep: float = 1.0) -> Path:
+        """Fetch/calculate per symbol, flush each row to intermediate CSV."""
         print(f"Start fetching rows for {len(symbols)} symbols. Output: {output_csv}")
-        first = True
         if output_csv.exists():
             output_csv.unlink()
 
         total = len(symbols)
         total_fetched = 0
+        f = None
+        writer = None
         DBLogger.print_progress(0, total, "Fetching rows")
-        for i in range(0, total, batch_size):
-            batch = symbols[i : i + batch_size]
-
-            rows = []
-            for j, sym in enumerate(batch):
+        try:
+            for i, sym in enumerate(symbols, 1):
                 raw_data = self._fetch_raw_data(sym)
                 if raw_data:
                     calc = DBRowCalculator(sym, raw_data)
-                    rows.append(calc.calculate())
-                DBLogger.print_progress(min(i + j + 1, total), total, f"Fetching {sym}")
-            if rows:
-                df = pd.DataFrame(rows)
-                df.to_csv(output_csv, mode='a', index=False, header=first)
-                first = False
-                total_fetched += len(rows)
-
-            if sleep and (i + batch_size < total):
-                time.sleep(sleep)
+                    row = calc.calculate()
+                    if writer is None:
+                        f = open(output_csv, "w", newline="")
+                        writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+                        writer.writeheader()
+                    writer.writerow(row)
+                    f.flush()
+                    total_fetched += 1
+                DBLogger.print_progress(i, total, f"Fetching {sym}")
+                if sleep:
+                    time.sleep(sleep)
+        finally:
+            if f:
+                f.close()
 
         print(f"Done fetching {total_fetched}. Saved to {output_csv}")
         return output_csv

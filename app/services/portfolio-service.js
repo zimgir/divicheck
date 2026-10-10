@@ -21,8 +21,12 @@ function getRootDir() {
   return path.resolve(__dirname, '..', '..');
 }
 
+function getMetaPath() {
+  return process.env.DIVICHECK_META_PATH || path.join(getRootDir(), '.app', 'analysis-meta.json');
+}
+
 async function getLastOpenPath() {
-  const metaPath = path.join(getRootDir(), '.app', 'analysis-meta.json');
+  const metaPath = getMetaPath();
   try {
     const data = await fs.readFile(metaPath, 'utf8');
     const meta = JSON.parse(data);
@@ -33,7 +37,7 @@ async function getLastOpenPath() {
 }
 
 async function getLastBrowsePath() {
-  const metaPath = path.join(getRootDir(), '.app', 'analysis-meta.json');
+  const metaPath = getMetaPath();
   try {
     const data = await fs.readFile(metaPath, 'utf8');
     const meta = JSON.parse(data);
@@ -44,12 +48,11 @@ async function getLastBrowsePath() {
 }
 
 async function setPortfolioDir(dirPath) {
-  const rootDir = getRootDir();
-  const appDir = path.join(rootDir, '.app');
+  const metaPath = getMetaPath();
+  const appDir = path.dirname(metaPath);
   if (!fsSync.existsSync(appDir)) {
     await fs.mkdir(appDir, { recursive: true });
   }
-  const metaPath = path.join(appDir, 'analysis-meta.json');
   let meta = {};
   try {
     const data = await fs.readFile(metaPath, 'utf8');
@@ -95,7 +98,7 @@ async function setPortfolioDir(dirPath) {
 
 async function resetPortfolio() {
   currentPortfolioDir = null;
-  const metaPath = path.join(getRootDir(), '.app', 'analysis-meta.json');
+  const metaPath = getMetaPath();
   try {
     const data = await fs.readFile(metaPath, 'utf8');
     const meta = JSON.parse(data);

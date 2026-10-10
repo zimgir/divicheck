@@ -4,6 +4,9 @@ const { parseDateTimestamp, compareDbDates, getFormattedDate } = require('../uti
 const { isRecordComplete, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath } = require('../services/portfolio-service');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+process.env.DIVICHECK_META_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'divicheck-meta-')), 'analysis-meta.json');
 
 test('parseDateTimestamp handles valid and invalid dates', () => {
   assert.strictEqual(parseDateTimestamp('2026-03-05 12:00:00'), Date.parse('2026-03-05T12:00:00'));
@@ -36,7 +39,7 @@ test('compareDbDates compares db format dates correctly', () => {
 
 test('analysis meta last_browse_path saves regardless of success or failure', async () => {
   await resetPortfolio();
-  const metaPath = path.join(__dirname, '..', '..', '.app', 'analysis-meta.json');
+  const metaPath = process.env.DIVICHECK_META_PATH;
   if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
   const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'divicheck-test-'));
   const res = await setPortfolioDir(tmpDir);

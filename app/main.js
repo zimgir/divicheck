@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
-const { getStats, getPortfolioStats, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath } = require('./services/db-service');
+const { getStats } = require('./services/db-service');
+const { getPortfolioStats, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath, getPortfolioSymbols } = require('./services/portfolio-service');
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
@@ -36,7 +37,9 @@ app.on('window-all-closed', () => {
 });
 
 ipcMain.handle('get-stats', async () => {
-  return getStats();
+  const stats = getStats();
+  stats.portfolio_symbols = await getPortfolioSymbols();
+  return stats;
 });
 
 ipcMain.handle('get-portfolio-stats', async () => {
@@ -45,7 +48,7 @@ ipcMain.handle('get-portfolio-stats', async () => {
 
 ipcMain.handle('select-portfolio-folder', async () => {
   const mainWindow = BrowserWindow.getFocusedWindow();
-  const lastBrowse = getLastBrowsePath();
+  const lastBrowse = await getLastBrowsePath();
   const dialogOpts = { properties: ['openDirectory'] };
   if (lastBrowse) {
     dialogOpts.defaultPath = lastBrowse;

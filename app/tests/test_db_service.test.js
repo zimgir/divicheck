@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { parseDateTimestamp, compareDbDates, isRecordComplete, getFormattedDate, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath } = require('../services/db-service');
+const { parseDateTimestamp, compareDbDates, getFormattedDate } = require('../utils/date-utils');
+const { isRecordComplete, setPortfolioDir, resetPortfolio, getLastOpenPath, getLastBrowsePath } = require('../services/portfolio-service');
 const fs = require('fs');
 const path = require('path');
 
@@ -33,55 +34,57 @@ test('compareDbDates compares db format dates correctly', () => {
   assert.strictEqual(compareDbDates('2026-03-05 12:00:00', '2026-03-05 12:00:00'), 0);
 });
 
-test('analysis meta last_browse_path saves regardless of success or failure', () => {
+test('analysis meta last_browse_path saves regardless of success or failure', async () => {
+  await resetPortfolio();
+  const metaPath = path.join(__dirname, '..', '..', '.app', 'analysis-meta.json');
+  if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
   const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'divicheck-test-'));
-  // Empty dir without portfolio.json (failure case)
-  const res = setPortfolioDir(tmpDir);
+  const res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, false);
-  assert.strictEqual(getLastBrowsePath(), tmpDir);
-  assert.strictEqual(getLastOpenPath(), null);
+  assert.strictEqual(await getLastBrowsePath(), tmpDir);
+  assert.strictEqual(await getLastOpenPath(), null);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('analysis meta last_open_path updates and resets correctly', () => {
+test('analysis meta last_open_path updates and resets correctly', async () => {
   const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'divicheck-test-'));
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test', holdings: [] }));
 
-  const res = setPortfolioDir(tmpDir);
+  const res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, true);
-  assert.strictEqual(getLastOpenPath(), tmpDir);
+  assert.strictEqual(await getLastOpenPath(), tmpDir);
 
-  resetPortfolio();
-  assert.strictEqual(getLastOpenPath(), null);
+  await resetPortfolio();
+  assert.strictEqual(await getLastOpenPath(), null);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('setPortfolioDir validates holdings field and structure', () => {
+test('setPortfolioDir validates holdings field and structure', async () => {
   const tmpDir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'divicheck-test-'));
 
   // Missing holdings
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test' }));
-  let res = setPortfolioDir(tmpDir);
+  let res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, false);
   assert.match(res.error, /holdings/i);
 
   // Holdings not array
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test', holdings: 'not-an-array' }));
-  res = setPortfolioDir(tmpDir);
+  res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, false);
   assert.match(res.error, /holdings/i);
 
-  // Invalid holding structure (missing s or n)
+  // Invalid holding structure
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test', holdings: [{ s: 'AAPL' }] }));
-  res = setPortfolioDir(tmpDir);
+  res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, false);
   assert.match(res.error, /structure|holding/i);
 
   // Valid holdings
   fs.writeFileSync(path.join(tmpDir, 'portfolio.json'), JSON.stringify({ name: 'Test', holdings: [{ s: 'AAPL', n: 10 }] }));
-  res = setPortfolioDir(tmpDir);
+  res = await setPortfolioDir(tmpDir);
   assert.strictEqual(res.success, true);
 
   fs.rmSync(tmpDir, { recursive: true, force: true });

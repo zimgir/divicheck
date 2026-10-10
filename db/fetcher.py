@@ -1,3 +1,4 @@
+import sys
 import time
 import pandas as pd
 import yfinance as yf
@@ -6,7 +7,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 
-from db.logger import DBLogger, log_streams_to
+from db.logger import DBLogger
 from db.calculator import DBRowCalculator
 from db.schema import SCHEMA
 
@@ -42,95 +43,89 @@ class DBDataFetcher:
 
 
     def fetch_divident_symbols(self, symbols: list[str], last_n_years: int = 5, batch_size: int = 40, sleep: float = 1.0, output_path: str = "symbols_dividend.txt") -> list[str]:
-        logger = DBLogger.get_logger("filter_divident", reset=True)
+        print(f"Start proccessing {len(symbols)} symbols")
 
-        with log_streams_to(logger):
-            print(f"Start proccessing {len(symbols)} symbols")
+        dividend_symbols = []
 
-            dividend_symbols = []
+        out = Path(output_path)
+        if out.exists():
+            out.unlink()
+        try:
+            for i in range(0, len(symbols), batch_size):
+                batch = symbols[i : i + batch_size]
+                try:
+                    tickers_obj = yf.Tickers(" ".join(batch))
+                    for sym in batch:
 
-            out = Path(output_path)
-            if out.exists():
-                out.unlink()
-            try:
-                for i in range(0, len(symbols), batch_size):
-                    batch = symbols[i : i + batch_size]
-                    try:
-                        tickers_obj = yf.Tickers(" ".join(batch))
-                        for sym in batch:
+                        try:
+                            ticker = tickers_obj.tickers[sym]
+                            divs = self._retry_on_rate_limit(lambda: ticker.dividends)
+                            if self._filter_divident_symbols(divs, last_n_years=last_n_years):
+                                dividend_symbols.append(sym)
+                                with open(out, "a") as f:
+                                    f.write(sym + "\n")
 
-                            try:
-                                ticker = tickers_obj.tickers[sym]
-                                divs = self._retry_on_rate_limit(lambda: ticker.dividends)
-                                if self._filter_divident_symbols(divs, last_n_years=last_n_years):
-                                    dividend_symbols.append(sym)
-                                    with open(out, "a") as f:
-                                        f.write(sym + "\n")
-
-                            except KeyboardInterrupt:
-                                raise
-                            except Exception as e:
-                                logger.error(f"{sym} inner consecutive filter fail: {e}")
-                        DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols), "Filtering dividend symbols")
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        logger.error(f"Batch processing failed for {batch}: {e}")
-                        time.sleep(5 * sleep)
-                        continue
-                    if sleep and (i + batch_size < len(symbols)):
-                        time.sleep(sleep)
-            except KeyboardInterrupt:
-                print("Got KeyboardInterrupt stopping...")
-            print(f"Done processing {len(dividend_symbols)} symbols")
-            return dividend_symbols
+                        except KeyboardInterrupt:
+                            raise
+                        except Exception as e:
+                            print(f"{sym} inner consecutive filter fail: {e}", file=sys.stderr)
+                    DBLogger.print_progress(min(i + batch_size, len(symbols)), len(symbols), "Filtering dividend symbols")
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    print(f"Batch processing failed for {batch}: {e}", file=sys.stderr)
+                    time.sleep(5 * sleep)
+                    continue
+                if sleep and (i + batch_size < len(symbols)):
+                    time.sleep(sleep)
+        except KeyboardInterrupt:
+            print("Got KeyboardInterrupt stopping...")
+        print(f"Done processing {len(dividend_symbols)} symbols")
+        return dividend_symbols
 
 
     def fetch_db_rows(self, symbols: list[str], output_csv: Path, batch_size: int = 40, sleep: float = 1.0) -> Path:
         """Fetch/calculate in batches, write directly to intermediate CSV."""
-        logger = DBLogger.get_logger("fetch_db_rows", reset=True)
-        with log_streams_to(logger):
-            print(f"Start fetching rows for {len(symbols)} symbols. Output: {output_csv}")
-            first = True
-            if output_csv.exists():
-                output_csv.unlink()
+        print(f"Start fetching rows for {len(symbols)} symbols. Output: {output_csv}")
+        first = True
+        if output_csv.exists():
+            output_csv.unlink()
 
-            total = len(symbols)
-            total_fetched = 0
-            DBLogger.print_progress(0, total, "Fetching rows")
-            for i in range(0, total, batch_size):
-                batch = symbols[i : i + batch_size]
+        total = len(symbols)
+        total_fetched = 0
+        DBLogger.print_progress(0, total, "Fetching rows")
+        for i in range(0, total, batch_size):
+            batch = symbols[i : i + batch_size]
 
-                rows = []
-                for j, sym in enumerate(batch):
-                    raw_data = self._fetch_raw_data(sym)
-                    if raw_data:
-                        calc = DBRowCalculator(sym, raw_data)
-                        rows.append(calc.calculate())
-                    DBLogger.print_progress(min(i + j + 1, total), total, f"Fetching {sym}")
-                if rows:
-                    df = pd.DataFrame(rows)
-                    df.to_csv(output_csv, mode='a', index=False, header=first)
-                    first = False
-                    total_fetched += len(rows)
+            rows = []
+            for j, sym in enumerate(batch):
+                raw_data = self._fetch_raw_data(sym)
+                if raw_data:
+                    calc = DBRowCalculator(sym, raw_data)
+                    rows.append(calc.calculate())
+                DBLogger.print_progress(min(i + j + 1, total), total, f"Fetching {sym}")
+            if rows:
+                df = pd.DataFrame(rows)
+                df.to_csv(output_csv, mode='a', index=False, header=first)
+                first = False
+                total_fetched += len(rows)
 
-                if sleep and (i + batch_size < total):
-                    time.sleep(sleep)
+            if sleep and (i + batch_size < total):
+                time.sleep(sleep)
 
-            print(f"Done fetching {total_fetched}. Saved to {output_csv}")
-            return output_csv
+        print(f"Done fetching {total_fetched}. Saved to {output_csv}")
+        return output_csv
 
 
     def _fetch_raw_data(self, symbol: str) -> dict | None:
         """Fetch all raw data for a symbol."""
-        logger = DBLogger.get_logger("fetch_all", reset=False)
         symbol = symbol.strip().upper()
         if not symbol: return None
         try:
             t = yf.Ticker(symbol)
             info = self._retry_on_rate_limit(lambda: t.info or {})
             if not self._is_payer(info):
-                logger.error(f"{symbol} skip: non-payer")
+                print(f"{symbol} skip: non-payer", file=sys.stderr)
                 return None
             dividends = self._retry_on_rate_limit(lambda: t.dividends)
             if dividends is None: dividends = pd.Series(dtype=float)
@@ -157,7 +152,7 @@ class DBDataFetcher:
                 "history": hist
             }
         except Exception as e:
-            logger.error(f"{symbol} fetch raw data fail: {e}")
+            print(f"{symbol} fetch raw data fail: {e}", file=sys.stderr)
             return None
 
 

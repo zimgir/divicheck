@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from db import ALL_SYMBOLS_PATH, DIVIDEND_SYMBOLS_PATH, DEFAULT_SYMBOLS_PATH, DB_PATH, FETCH_ROWS_PATH, FALLBACK_SYMBOLS
 from db.fetcher import DBDataFetcher
 from db.db_controller import SQLDBController
-from db.logger import DBLogger
+from db.logger import DBLogger, log_streams_to
 
 
 
@@ -154,39 +154,43 @@ def cmd_stats(args) -> int:
 
 
 def main(argv=None) -> int:
-    parser_main = argparse.ArgumentParser(
-        prog="db_cli",
-        description="Database CLI tools.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser_main.add_argument("--db", default=str(DB_PATH), help="Path to database file.")
-    parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/update).")
-    parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by symbols/update).")
-    parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/update).")
-    parser_main.add_argument("--progress", type=Path, default=None, help="Path to JSON progress file (used by symbols/update).")
+    logger = DBLogger.get_logger("db_cli")
+    cmdline = sys.argv if argv is None else [sys.argv[0], *argv]
+    logger.info("command: " + " ".join(str(a) for a in cmdline))
+    with log_streams_to(logger):
+        parser_main = argparse.ArgumentParser(
+            prog="db_cli",
+            description="Database CLI tools.",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
+        parser_main.add_argument("--db", default=str(DB_PATH), help="Path to database file.")
+        parser_main.add_argument("--symbols", type=Path, default=DIVIDEND_SYMBOLS_PATH, help="Path to symbols file (used by symbols/update).")
+        parser_main.add_argument("--sleep", type=float, default=1.0, help="Sleep time between fetches (used by symbols/update).")
+        parser_main.add_argument("--batch", type=int, default=40, help="Batch size for fetches (used by symbols/update).")
+        parser_main.add_argument("--progress", type=Path, default=None, help="Path to JSON progress file (used by symbols/update).")
 
-    parser_sub = parser_main.add_subparsers(dest="cmd", required=True)
+        parser_sub = parser_main.add_subparsers(dest="cmd", required=True)
 
-    parser_symbols = parser_sub.add_parser("symbols", help="Generate/update symbol lists.")
-    parser_symbols.add_argument("--all", action="store_true", help="Force regenerate all symbols.")
+        parser_symbols = parser_sub.add_parser("symbols", help="Generate/update symbol lists.")
+        parser_symbols.add_argument("--all", action="store_true", help="Force regenerate all symbols.")
 
-    parser_update = parser_sub.add_parser("update", help="Update database.")
-    parser_update.add_argument("--prune", action="store_true", help="Remove symbols not in the list.")
-    parser_update.add_argument("--reset", action="store_true", help="Rebuild database from scratch.")
+        parser_update = parser_sub.add_parser("update", help="Update database.")
+        parser_update.add_argument("--prune", action="store_true", help="Remove symbols not in the list.")
+        parser_update.add_argument("--reset", action="store_true", help="Rebuild database from scratch.")
 
-    parser_stats = parser_sub.add_parser("stats", help="Show database statistics.")
-    parser_stats.add_argument("--json", action="store_true", help="Output stats as JSON.")
+        parser_stats = parser_sub.add_parser("stats", help="Show database statistics.")
+        parser_stats.add_argument("--json", action="store_true", help="Output stats as JSON.")
 
-    args = parser_main.parse_args(argv)
+        args = parser_main.parse_args(argv)
 
-    DBLogger.progress_path = args.progress
+        DBLogger.progress_path = args.progress
 
-    cmds = {"symbols": cmd_symbols,
-            "update": cmd_update,
-            "stats": cmd_stats,
-            }
+        cmds = {"symbols": cmd_symbols,
+                "update": cmd_update,
+                "stats": cmd_stats,
+                }
 
-    return cmds[args.cmd](args)
+        return cmds[args.cmd](args)
 
 
 if __name__ == "__main__":

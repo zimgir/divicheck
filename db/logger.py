@@ -2,27 +2,56 @@ import sys
 import json
 import logging
 import contextlib
+from datetime import datetime
 from pathlib import Path
 from db import LOGS_DIR
+
+
+class _OriginFilter(logging.Filter):
+    """Rewrite record.funcName to the first non-logging/non-logger frame."""
+
+    def filter(self, record):
+        frame = sys._getframe(1)
+        while frame is not None:
+            name = frame.f_globals.get("__name__", "")
+            if name != "logging" and not name.startswith("logging.") and frame.f_code.co_filename != __file__:
+                record.funcName = frame.f_code.co_name
+                break
+            frame = frame.f_back
+        return True
 
 
 class DBLogger:
     progress_path = None
 
     @staticmethod
-    def get_logger(name: str, reset: bool = True):
-        log_file = LOGS_DIR / f"{name}.log"
+    def get_logger(name: str = "db_cli", keep: int = 5):
+        idx_file = LOGS_DIR / f"{name}.index"
+        try:
+            idx = int(idx_file.read_text().strip())
+        except (OSError, ValueError):
+            idx = 0
+        n = idx % keep
+        for old in LOGS_DIR.glob(f"{name}.{n}.*.log"):
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log_file = LOGS_DIR / f"{name}.{n}.{stamp}.log"
+        idx_file.write_text(str((n + 1) % keep))
+
         logger = logging.getLogger(name)
         logger.setLevel(logging.INFO)
         if logger.hasHandlers():
             logger.handlers.clear()
 
-        handler = logging.FileHandler(log_file, mode="w" if reset else "a")
-        formatter = logging.Formatter(
-            "[%(asctime)s] %(levelname)s: %(message)s",
+        handler = logging.FileHandler(log_file, mode="w")
+        handler.setFormatter(logging.Formatter(
+            "[%(asctime)s] %(levelname)s [%(funcName)s]: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
-        )
-        handler.setFormatter(formatter)
+        ))
+        handler.addFilter(_OriginFilter())
         logger.addHandler(handler)
         return logger
 

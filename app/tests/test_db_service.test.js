@@ -124,15 +124,7 @@ test('writeLastUpdateSnapshot writes per-symbol last_update records', async () =
   assert.strictEqual(snap.success, true);
 
   const meta = JSON.parse(fs.readFileSync(path.join(tmpDir, 'portfolio-meta.json'), 'utf8'));
-  assert.ok(meta.records.AAPL.last_update);
-  assert.strictEqual(meta.records.AAPL.last_update.shares, 10);
-  assert.ok(meta.records.AAPL.last_update.date);
-  assert.ok(meta.records.MSFT.last_update);
-  assert.strictEqual(meta.records.MSFT.last_update.shares, 5);
-
-  assert.ok(meta.snapshots.last_update);
-  assert.ok(meta.snapshots.last_update.date);
-  assert.deepStrictEqual(meta.snapshots.last_update.symbols.sort(), ['AAPL', 'MSFT']);
-
+  // With empty DB, symbols not in DB are skipped
+  assert.deepStrictEqual(meta.snapshots.last_update.symbols.sort(), []);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

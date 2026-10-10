@@ -48,7 +48,9 @@ class DiviTable extends HTMLElement {
       const key = item.getAttribute('data-legend-key');
       const idx = item.getAttribute('data-legend-index');
 
-      const matches = this.querySelectorAll(`tbody [data-legend-key="${key}"], tbody [data-legend-index="${idx}"]`);
+      const matches = this.querySelectorAll(
+        `tbody [data-legend-key~="${key}"], tbody [data-legend-key="${key}"], tbody [data-legend-index="${idx}"]`
+      );
       const count = matches.length;
 
       item.style.display = count > 0 ? 'flex' : 'none';

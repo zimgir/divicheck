@@ -22,10 +22,26 @@ window.addEventListener('resize', () => {
   document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
 });
 
+async function updateDbBanner() {
+  try {
+    const stats = await window.api.getStats();
+    const banner = document.getElementById('db-missing-banner');
+    if (banner) {
+      banner.style.display = stats.db_available === false ? 'block' : 'none';
+    }
+  } catch (e) {
+    const banner = document.getElementById('db-missing-banner');
+    if (banner) banner.style.display = 'none';
+  }
+}
+
+window.updateDbBanner = updateDbBanner;
+
 window.onload = async () => {
   while (!window.api || !window.api.getPortfolioStats) {
     await new Promise(r => setTimeout(r, 50));
   }
   await initTaskBar();
+  await updateDbBanner();
   loadAnalysis();
 };

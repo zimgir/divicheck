@@ -267,3 +267,13 @@ tr:hover {
   border-radius: 3px;
   vertical-align: middle;
 }
+
+.db-warning {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}

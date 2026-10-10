@@ -9,15 +9,32 @@ function getRootDir() {
 function getStockRows(symbols) {
   const rootDir = getRootDir();
   const dbPath = path.join(rootDir, '.db', 'divicheck.db');
-  if (!fs.existsSync(dbPath) || !symbols || symbols.length === 0) return [];
-  const db = new Database(dbPath, { readonly: true });
+  if (!isDbAvailable() || !symbols || symbols.length === 0) return [];
   try {
-    const placeholders = symbols.map(() => '?').join(',');
-    const query = `SELECT * FROM stocks WHERE SYMBOL IN (${placeholders})`;
-    return db.prepare(query).all(...symbols);
-  } finally {
-    db.close();
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const placeholders = symbols.map(() => '?').join(',');
+      const query = `SELECT * FROM stocks WHERE SYMBOL IN (${placeholders})`;
+      return db.prepare(query).all(...symbols);
+    } finally {
+      db.close();
+    }
+  } catch (e) {
+    return [];
   }
+}
+
+function isDbAvailable() {
+  const rootDir = getRootDir();
+  const dbPath = path.join(rootDir, '.db', 'divicheck.db');
+  if (!fs.existsSync(dbPath)) return false;
+  try {
+    const st = fs.statSync(dbPath);
+    if (st.size <= 0) return false;
+  } catch (e) {
+    return false;
+  }
+  return true;
 }
 
 function getStats() {
@@ -28,34 +45,47 @@ function getStats() {
 
   let file_size = 0;
   if (fs.existsSync(dbPath)) {
-    file_size = fs.statSync(dbPath).size;
+    try {
+      file_size = fs.statSync(dbPath).size;
+    } catch (e) {
+      file_size = 0;
+    }
   }
 
   let symbols = fallbackSymbols;
   let source = "FALLBACK_SYMBOLS";
 
   if (fs.existsSync(defaultSymbolsPath)) {
-    const content = fs.readFileSync(defaultSymbolsPath, 'utf8');
-    symbols = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    source = "DEFAULT_SYMBOLS";
+    try {
+      const content = fs.readFileSync(defaultSymbolsPath, 'utf8');
+      symbols = content.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      source = "DEFAULT_SYMBOLS";
+    } catch (e) {
+      // keep fallback
+    }
   }
 
   let total_rows = 0;
   let rows = [];
 
-  if (fs.existsSync(dbPath)) {
-    const db = new Database(dbPath, { readonly: true });
+  if (isDbAvailable()) {
     try {
-      const countRes = db.prepare("SELECT count(*) as cnt FROM stocks").get();
-      total_rows = countRes ? countRes.cnt : 0;
+      const db = new Database(dbPath, { readonly: true });
+      try {
+        const countRes = db.prepare("SELECT count(*) as cnt FROM stocks").get();
+        total_rows = countRes ? countRes.cnt : 0;
 
-      if (symbols.length > 0) {
-        const placeholders = symbols.map(() => '?').join(',');
-        const query = `SELECT * FROM stocks WHERE SYMBOL IN (${placeholders})`;
-        rows = db.prepare(query).all(...symbols);
+        if (symbols.length > 0) {
+          const placeholders = symbols.map(() => '?').join(',');
+          const query = `SELECT * FROM stocks WHERE SYMBOL IN (${placeholders})`;
+          rows = db.prepare(query).all(...symbols);
+        }
+      } finally {
+        db.close();
       }
-    } finally {
-      db.close();
+    } catch (e) {
+      total_rows = 0;
+      rows = [];
     }
   }
 
@@ -74,11 +104,13 @@ function getStats() {
     source,
     symbols,
     rows,
-    col_info
+    col_info,
+    db_available: isDbAvailable()
   };
 }
 
 module.exports = {
   getStats,
-  getStockRows
+  getStockRows,
+  isDbAvailable
 };

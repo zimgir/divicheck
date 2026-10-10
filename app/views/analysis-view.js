@@ -124,14 +124,16 @@ function diffSelectorHtml() {
 function renderAnalysis(stats) {
   const sd = (stats.summary_diff && stats.summary_diff[currentBaseline]) || {};
 
+  const dbWarningHtml = '';
   document.getElementById('analysis-summary').innerHTML = `
+    ${dbWarningHtml}
     <table>
       <tr><td><strong>Portfolio Name:</strong></td><td>${stats.portfolio_name}</td></tr>
       <tr><td><strong>Number of Holdings:</strong></td><td>${stats.holdings.length}${formatDiff(sd.holdings_count)}</td></tr>
-      <tr><td><strong>Total Holdings Value:</strong></td><td>$${stats.total_holdings_value}${formatDiff(sd.total_holdings_value)}</td></tr>
-      <tr><td><strong>Average Dividend Yield:</strong></td><td>${stats.average_dividend_yield}%${formatDiff(sd.average_dividend_yield)}</td></tr>
-      <tr><td><strong>Expected Total Yearly Dividend:</strong></td><td>$${stats.expected_total_yearly_dividend}${formatDiff(sd.expected_total_yearly_dividend)}</td></tr>
-      <tr><td><strong>Expected Monthly Dividend:</strong></td><td>$${stats.expected_monthly_dividend}${formatDiff(sd.expected_monthly_dividend)}</td></tr>
+      <tr><td><strong>Total Holdings Value:</strong></td><td>${stats.total_holdings_value === 'N/A' ? 'N/A' : ('$' + stats.total_holdings_value)}${formatDiff(sd.total_holdings_value)}</td></tr>
+      <tr><td><strong>Average Dividend Yield:</strong></td><td>${stats.average_dividend_yield === 'N/A' ? 'N/A' : (stats.average_dividend_yield + '%')}${formatDiff(sd.average_dividend_yield)}</td></tr>
+      <tr><td><strong>Expected Total Yearly Dividend:</strong></td><td>${stats.expected_total_yearly_dividend === 'N/A' ? 'N/A' : ('$' + stats.expected_total_yearly_dividend)}${formatDiff(sd.expected_total_yearly_dividend)}</td></tr>
+      <tr><td><strong>Expected Monthly Dividend:</strong></td><td>${stats.expected_monthly_dividend === 'N/A' ? 'N/A' : ('$' + stats.expected_monthly_dividend)}${formatDiff(sd.expected_monthly_dividend)}</td></tr>
       <tr><td><strong>Portfolio Path:</strong></td><td>${stats.portfolio_path}</td></tr>
     </table>
     <div style="display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #333333;">
@@ -177,28 +179,47 @@ function renderAnalysis(stats) {
     tbody.innerHTML = '<tr><td colspan="8">No data</td></tr>';
     if (noDataMsg) noDataMsg.style.display = 'flex';
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
+    if (window.sectorChartInstance) {
+      window.sectorChartInstance.destroy();
+      window.sectorChartInstance = null;
+    }
     return;
   }
 
-  if (noDataMsg) noDataMsg.style.display = 'none';
-
   tbody.innerHTML = stats.holdings.map(h => {
     const badge = (h.status && h.status[currentBaseline] === 'new') ? ' <span class="badge-new">new</span>' : '';
+    const legendKeys = [];
+    const isMissing = h.in_db === false;
+    if (isMissing) legendKeys.push('missing');
+    if (!isMissing && h.db_filtered) legendKeys.push('filtered');
+    const legendAttrs = legendKeys.length > 0 ? `data-legend-key="${legendKeys.join(' ')}"` : '';
+    let symbolStyle = '';
+    if (isMissing) symbolStyle = 'style="color: #ef4444;"';
+    else if (h.db_filtered) symbolStyle = 'style="color: #facc15;"';
     return `
-      <tr ${h.db_filtered ? 'data-legend-index="0"' : ''}>
-        <td ${h.db_filtered ? 'style="color: #facc15;"' : ''}>${h.symbol}${badge}</td>
+      <tr ${legendAttrs}>
+        <td ${symbolStyle}>${h.symbol}${badge}</td>
         <td>${h.company}</td>
         <td>${h.shares}${cellDiff(h, currentBaseline, 'shares')}</td>
-        <td>$${h.price}${cellDiff(h, currentBaseline, 'price')}</td>
-        <td>$${h.holding_value}${cellDiff(h, currentBaseline, 'holding_value')}</td>
-        <td>$${h.yearly_dividend}${cellDiff(h, currentBaseline, 'yearly_dividend')}</td>
-        <td>${h.yield_1y}%${cellDiff(h, currentBaseline, 'yield')}</td>
+        <td>${h.price === 'N/A' ? 'N/A' : ('$' + h.price)}${cellDiff(h, currentBaseline, 'price')}</td>
+        <td>${h.holding_value === 'N/A' ? 'N/A' : ('$' + h.holding_value)}${cellDiff(h, currentBaseline, 'holding_value')}</td>
+        <td>${h.yearly_dividend === 'N/A' ? 'N/A' : ('$' + h.yearly_dividend)}${cellDiff(h, currentBaseline, 'yearly_dividend')}</td>
+        <td>${h.yield_1y === 'N/A' ? 'N/A' : (h.yield_1y + '%')}${cellDiff(h, currentBaseline, 'yield')}</td>
         <td>${h.updated_at}</td>
       </tr>
     `;
   }).join('');
 
-  const ctx = document.getElementById('sectorPieChart').getContext('2d');
+  const hasValidSectors = stats.sectors && stats.sectors.values && stats.sectors.values.length > 0 && stats.sectors.values.some(v => Number(v) > 0);
+  if (!hasValidSectors) {
+    if (window.sectorChartInstance) {
+      window.sectorChartInstance.destroy();
+      window.sectorChartInstance = null;
+    }
+    if (noDataMsg) noDataMsg.style.display = 'flex';
+  } else {
+    if (noDataMsg) noDataMsg.style.display = 'none';
+    const ctx = document.getElementById('sectorPieChart').getContext('2d');
     const sectorColors = [
       '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444',
       '#ec4899', '#8b5cf6', '#3b82f6', '#14b8a6', '#84cc16',
@@ -246,7 +267,8 @@ function renderAnalysis(stats) {
         }
       }
     });
-    document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
+  }
+  document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
 }
 
 export async function loadAnalysis() {
@@ -256,6 +278,7 @@ export async function loadAnalysis() {
     hasPortfolio = true;
     lastStats = stats;
     currentBaseline = 'last_update';
+    if (window.updateDbBanner) window.updateDbBanner();
     renderAnalysis(stats);
   } catch (err) {
     hasPortfolio = false;
@@ -272,5 +295,6 @@ export async function loadAnalysis() {
     document.getElementById('analysis-body').innerHTML = `<tr><td colspan="8" style="color: red;">Failed to load portfolio analysis</td></tr>`;
     const noDataMsg = document.getElementById('pie-no-data-msg');
     if (noDataMsg) noDataMsg.style.display = 'flex';
+    if (window.updateDbBanner) window.updateDbBanner();
   }
 }

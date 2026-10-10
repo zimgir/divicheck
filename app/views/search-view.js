@@ -45,6 +45,8 @@ export async function loadData() {
     document.querySelectorAll('divi-table').forEach(dt => dt.updateStickyHeader());
   } catch (err) {
     document.getElementById('stats-summary').innerHTML = `<span style="color: red;">Error: ${err.message}</span>`;
-    document.getElementById('search-body').innerHTML = `<tr><td colspan="1" style="color: red;">Failed to data</td></tr>`;
+    document.getElementById('search-body').innerHTML = `<tr><td colspan="1" style="color: red;">Failed to load data</td></tr>`;
+  } finally {
+    if (window.updateDbBanner) window.updateDbBanner();
   }
 }

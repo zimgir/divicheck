@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { getFormattedDate, compareDbDates } = require('../utils/date-utils');
-const { getStockRows } = require('./db-service');
+const { getStockRows, isDbAvailable } = require('./db-service');
 
 let currentPortfolioDir = null;
 
@@ -207,7 +207,8 @@ async function getPortfolioStats() {
 
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
-    const isFiltered = dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
+    const inDbHolding = !!dbRows[sym];
+    const isFiltered = inDbHolding && dividendSymbols.size > 0 ? !dividendSymbols.has(sym) : false;
 
     parsedMeta.flags[sym] = parsedMeta.flags[sym] || {};
     if (parsedMeta.flags[sym].db_filtered !== isFiltered) {
@@ -222,18 +223,26 @@ async function getPortfolioStats() {
     const shares = Number(h.n) || 0;
     const recordData = buildRecordData(stock, shares);
 
-    if (!isRecordComplete(symbolRecords.init)) {
-      symbolRecords.init = recordData;
-      portfolioUpdated = true;
-    }
-    if (!isRecordComplete(symbolRecords.last_update)) {
-      symbolRecords.last_update = recordData;
-      portfolioUpdated = true;
-    }
-
-    if (symbolRecords.init && symbolRecords.last_update && compareDbDates(symbolRecords.init.date, symbolRecords.last_update.date) > 0) {
-      symbolRecords.init = JSON.parse(JSON.stringify(symbolRecords.last_update));
-      portfolioUpdated = true;
+    if (inDbHolding) {
+      if (!isRecordComplete(symbolRecords.init)) {
+        symbolRecords.init = recordData;
+        portfolioUpdated = true;
+      }
+      if (!isRecordComplete(symbolRecords.last_update)) {
+        symbolRecords.last_update = recordData;
+        portfolioUpdated = true;
+      }
+      if (symbolRecords.init && symbolRecords.last_update && compareDbDates(symbolRecords.init.date, symbolRecords.last_update.date) > 0) {
+        symbolRecords.init = JSON.parse(JSON.stringify(symbolRecords.last_update));
+        portfolioUpdated = true;
+      }
+    } else {
+      if (isRecordComplete(symbolRecords.init)) {
+        portfolioUpdated = false;
+      }
+      if (isRecordComplete(symbolRecords.last_update)) {
+        portfolioUpdated = false;
+      }
     }
   }
 
@@ -265,15 +274,20 @@ async function getPortfolioStats() {
     const symbol = h.s;
     const shares = Number(h.n) || 0;
     const stock = dbRows[symbol] || {};
-    const price = Number(stock.PRICE) || 0;
-    const div1y = stock.DIV_1Y !== null && stock.DIV_1Y !== undefined ? Number(stock.DIV_1Y) : (Number(stock.CUR_DIV || 0) * Number(stock.NUM_DIV_1Y || 4));
-    const yield1y = stock.YIELD_1Y !== null && stock.YIELD_1Y !== undefined ? Number(stock.YIELD_1Y) : (price > 0 ? (div1y / price) * 100 : 0);
+    const inDb = !!dbRows[symbol];
+    const price = inDb && stock.PRICE !== null && stock.PRICE !== undefined ? Number(stock.PRICE) : NaN;
+    const div1y = inDb ? (
+      stock.DIV_1Y !== null && stock.DIV_1Y !== undefined ? Number(stock.DIV_1Y) : (Number(stock.CUR_DIV || 0) * Number(stock.NUM_DIV_1Y || 4))
+    ) : NaN;
+    const yield1y = inDb ? (
+      stock.YIELD_1Y !== null && stock.YIELD_1Y !== undefined ? Number(stock.YIELD_1Y) : (price > 0 ? (div1y / price) * 100 : 0)
+    ) : NaN;
 
-    const holdingValue = shares * price;
-    const yearlyDividend = shares * div1y;
+    const holdingValue = !isNaN(price) ? shares * price : NaN;
+    const yearlyDividend = !isNaN(div1y) ? shares * div1y : NaN;
 
-    totalHoldingsValue += holdingValue;
-    totalYearlyDividend += yearlyDividend;
+    if (!isNaN(holdingValue)) totalHoldingsValue += holdingValue;
+    if (!isNaN(yearlyDividend)) totalYearlyDividend += yearlyDividend;
 
     const symKey = (symbol || '').toUpperCase();
     const diff = {};
@@ -282,7 +296,7 @@ async function getPortfolioStats() {
       const rec = (parsedMeta.records[symKey] && parsedMeta.records[symKey][key]) || null;
       const isNew = !baselineSymbols[key].has(symKey);
       status[key] = isNew ? 'new' : 'shared';
-      if (rec && !isNew) {
+      if (inDb && rec && !isNew) {
         const baseShares = Number(rec.shares) || 0;
         const basePrice = Number(rec.price) || 0;
         diff[key] = {
@@ -297,17 +311,20 @@ async function getPortfolioStats() {
       }
     }
 
+    const sectorVal = inDb && stock.SECTOR && String(stock.SECTOR).trim() !== '' ? String(stock.SECTOR).trim() : 'Unknown';
+
     detailedHoldings.push({
       symbol,
-      company: stock.COMPANY || symbol,
-      sector: stock.SECTOR || 'Unknown',
+      company: inDb && stock.COMPANY ? stock.COMPANY : symbol,
+      sector: sectorVal,
       shares,
-      price: price ? price.toFixed(2) : 'N/A',
-      holding_value: holdingValue ? holdingValue.toFixed(2) : '0.00',
-      yearly_dividend: yearlyDividend ? yearlyDividend.toFixed(2) : '0.00',
-      yield_1y: yield1y ? yield1y.toFixed(2) : '0.00',
-      updated_at: stock.UPDATED_AT || 'N/A',
+      price: !isNaN(price) ? price.toFixed(2) : 'N/A',
+      holding_value: !isNaN(holdingValue) ? holdingValue.toFixed(2) : 'N/A',
+      yearly_dividend: !isNaN(yearlyDividend) ? yearlyDividend.toFixed(2) : 'N/A',
+      yield_1y: !isNaN(yield1y) ? yield1y.toFixed(2) : 'N/A',
+      updated_at: inDb && stock.UPDATED_AT ? stock.UPDATED_AT : 'N/A',
       db_filtered: !!(parsedMeta.flags && parsedMeta.flags[symbol] && parsedMeta.flags[symbol].db_filtered),
+      in_db: inDb,
       status,
       diff
     });
@@ -315,8 +332,10 @@ async function getPortfolioStats() {
 
   let sectorMap = {};
   for (const h of detailedHoldings) {
-    const sec = h.sector;
+    if (!h.in_db) continue;
     const val = Number(h.holding_value) || 0;
+    if (val <= 0) continue;
+    const sec = h.sector || 'Unknown';
     sectorMap[sec] = (sectorMap[sec] || 0) + val;
   }
   const sectorLabels = Object.keys(sectorMap);
@@ -338,19 +357,23 @@ async function getPortfolioStats() {
     };
   }
 
+  const dbAvailable = isDbAvailable();
+  const totalHoldingsValueNum = totalHoldingsValue;
+  const totalYearlyDividendNum = totalYearlyDividend;
   return {
     portfolio_name: portfolioName,
     portfolio_path: currentPortfolioDir ? currentPortfolioDir : 'N/A',
-    total_holdings_value: totalHoldingsValue.toFixed(2),
-    average_dividend_yield: averageDividendYield.toFixed(2),
-    expected_total_yearly_dividend: totalYearlyDividend.toFixed(2),
-    expected_monthly_dividend: expectedMonthlyDividend.toFixed(2),
+    total_holdings_value: (totalHoldingsValueNum && totalHoldingsValueNum > 0) || totalHoldingsValueNum === 0 ? totalHoldingsValueNum.toFixed(2) : 'N/A',
+    average_dividend_yield: averageDividendYield ? averageDividendYield.toFixed(2) : 'N/A',
+    expected_total_yearly_dividend: (totalYearlyDividendNum && totalYearlyDividendNum > 0) || totalYearlyDividendNum === 0 ? totalYearlyDividendNum.toFixed(2) : 'N/A',
+    expected_monthly_dividend: expectedMonthlyDividend ? expectedMonthlyDividend.toFixed(2) : 'N/A',
     holdings: detailedHoldings,
     summary_diff: summaryDiff,
     sectors: {
       labels: sectorLabels,
       values: sectorValues
-    }
+    },
+    db_available: dbAvailable
   };
 }
 
@@ -386,9 +409,11 @@ async function writeLastUpdateSnapshot() {
   const snapshotSymbols = [];
   for (const h of holdings) {
     const sym = (h.s || '').toUpperCase();
+    const inDb = !!dbRows[sym];
+    if (!inDb) continue;
     const shares = Number(h.n) || 0;
     meta.records[sym] = meta.records[sym] || {};
-    meta.records[sym].last_update = buildRecordData(dbRows[sym] || {}, shares);
+    meta.records[sym].last_update = buildRecordData(dbRows[sym], shares);
     snapshotSymbols.push(sym);
   }
   meta.snapshots.last_update = { date: getFormattedDate(), symbols: snapshotSymbols };

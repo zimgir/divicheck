@@ -12,6 +12,7 @@
       <button class="tab-btn active" onclick="switchView('analysis')">Analysis</button>
       <button class="tab-btn" onclick="switchView('search')">Search</button>
     </div>
+    <div id="db-missing-banner" class="db-warning" style="display: none; margin-bottom: 12px;">Database not available — no market data. Click Update to build it.</div>
   </div>
 
   <div id="view-search" class="view-content">
@@ -40,7 +41,7 @@
       </div>
     </div>
 
-    <divi-table id-prefix="analysis" legend="Filtered by stable dividend filter"></divi-table>
+    <divi-table id-prefix="analysis" legend="Not in database,Filtered by stable dividend filter" legend-color="#ef4444,#facc15" legend-key="missing,filtered"></divi-table>
   </div>
 
   <div id="db-task-bar" class="db-task-bar hidden">
